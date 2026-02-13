@@ -98,69 +98,140 @@ def calculate_match_score(media_data, profile):
     except: pass
     return {'total_score': round(score, 1), 'breakdown': details}
 
-def get_proactive_suggestions(db_instance, limit=20, target_people=None, target_genres=None):
+import time
+
+# Simple In-Memory Cache
+_suggestions_cache = {
+    'data': None,
+    'timestamp': 0,
+    'params_key': None
+}
+
+def get_proactive_suggestions(db_instance, limit=20, target_people=None, target_genres=None, refresh=False):
+    global _suggestions_cache
+    
+    # Generate a key based on params
+    params_key = f"{target_people}-{target_genres}"
+    
+    # Return cache if less than 5 minutes old, UNLESS refresh is requested
+    if not refresh and _suggestions_cache['data'] and (time.time() - _suggestions_cache['timestamp'] < 300) and _suggestions_cache['params_key'] == params_key:
+        return _suggestions_cache['data']
+
     profile = get_user_taste_profile()
     suggestions = []
     seen_titles = set([m.title.lower() for m in db_instance.session.query(Media.title).all()])
+    
+    # Use a session for faster repeated requests
+    session = requests.Session()
+    
     if target_people or target_genres:
-        for p in (target_people or []): suggestions.extend(fetch_by_person(p, profile, seen_titles, limit))
-        for g in (target_genres or []): suggestions.extend(fetch_by_genre(g, profile, seen_titles, limit))
+        # 1. Fetch filtered results
+        for p in (target_people or []): 
+            suggestions.extend(fetch_by_person(p, profile, seen_titles, limit, session))
+        for g in (target_genres or []): 
+            suggestions.extend(fetch_by_genre(g, profile, seen_titles, limit, session))
+            
+        # 2. If we have few results, supplement with general intelligence
+        if len(suggestions) < 5:
+            supplemental = get_general_intelligence_suggestions(db_instance, profile, seen_titles, limit // 2, session)
+            suggestions.extend(supplemental)
     else:
-        # Strategy A: Similarity via 'Loved' & 'Liked' Media DNA
-        # Prioritize loved items for the sample if available
-        dna_sample_pool = profile['loved_media'] + profile['liked_media']
-        if dna_sample_pool:
-            sample_likes = random.sample(dna_sample_pool, min(len(dna_sample_pool), 8))
-            for media in sample_likes:
-                actors = [mp.person.name for mp in media.person_memberships if mp.role == 'Actor'][:3]
-                genres = (media.genres or "").split(', ')
-                for actor in actors:
-                    candidates = fetch_by_person(actor, profile, seen_titles, 5)
-                    for c in candidates:
-                        c_genres = c['genre'].split(', ')
-                        if any(g in c_genres for g in genres):
-                            # Boost based on whether the DNA source was loved or liked
-                            boost = 40 if media.user_rating == 2 else 20
-                            c['match']['total_score'] += boost
-                            c['match']['breakdown'].insert(0, f"DNA Similarity to {media.title} (+{boost})")
-                            suggestions.append(c)
-        top_talent = sorted(profile['people'].items(), key=lambda x: x[1], reverse=True)[:10]
-        random.shuffle(top_talent)
-        for person_name, count in top_talent[:5]: suggestions.extend(fetch_by_person(person_name, profile, seen_titles, 5))
-    unique_suggestions = {s['title']: s for s in suggestions if s['poster']}.values()
-    high_quality = [s for s in unique_suggestions if s['match']['total_score'] > 30]
-    return sorted(high_quality if high_quality else unique_suggestions, key=lambda x: x['match']['total_score'], reverse=True)[:limit]
+        suggestions = get_general_intelligence_suggestions(db_instance, profile, seen_titles, limit, session)
 
-def fetch_by_person(person_name, profile, seen_titles, limit):
+    unique_suggestions = {s['title']: s for s in suggestions if s.get('poster')}.values()
+    high_quality = [s for s in unique_suggestions if s['match']['total_score'] > 20]
+    result = sorted(high_quality if high_quality else unique_suggestions, key=lambda x: x['match']['total_score'], reverse=True)[:limit]
+    
+    # Store in cache
+    _suggestions_cache['data'] = result
+    _suggestions_cache['timestamp'] = time.time()
+    _suggestions_cache['params_key'] = params_key
+    
+    return result
+
+def get_general_intelligence_suggestions(db_instance, profile, seen_titles, limit, session=None):
+    """Fallback/General strategy using user DNA."""
+    if session is None: session = requests.Session()
+    suggestions = []
+    
+    # Strategy A: Similarity via 'Loved' & 'Liked' Media DNA
+    dna_sample_pool = profile['loved_media'] + profile['liked_media']
+    if dna_sample_pool:
+        sample_size = min(len(dna_sample_pool), 8)
+        sample_likes = random.sample(dna_sample_pool, sample_size)
+        for media in sample_likes:
+            # Get up to 2 actors per show
+            actors = [mp.person.name for mp in media.person_memberships if mp.role == 'Actor'][:2]
+            genres = (media.genres or "").split(', ')
+            for actor in actors:
+                candidates = fetch_by_person(actor, profile, seen_titles, 3, session)
+                for c in candidates:
+                    c_genres = c['genre'].split(', ')
+                    if any(g in c_genres for g in genres):
+                        boost = 40 if media.user_rating == 2 else 20
+                        c['match']['total_score'] += boost
+                        c['match']['breakdown'].insert(0, f"DNA Similarity to {media.title} (+{boost})")
+                        suggestions.append(c)
+    
+    # Strategy B: Top Talent rotation
+    top_talent = sorted(profile['people'].items(), key=lambda x: x[1], reverse=True)[:10]
+    random.shuffle(top_talent)
+    for person_name, count in top_talent[:3]: 
+        suggestions.extend(fetch_by_person(person_name, profile, seen_titles, 5, session))
+        
+    return suggestions
+
+def fetch_by_person(person_name, profile, seen_titles, limit, session=None):
+    if session is None: session = requests.Session()
     results = []
     try:
-        person_res = requests.get(f"https://api.tvmaze.com/search/people?q={person_name}", timeout=5)
+        person_res = session.get(f"https://api.tvmaze.com/search/people?q={requests.utils.quote(person_name)}", timeout=5)
         if person_res.ok and person_res.json():
             person_id = person_res.json()[0]['person']['id']
-            credits_res = requests.get(f"https://api.tvmaze.com/people/{person_id}/castcredits?embed=show", timeout=5)
-            if credits_res.ok:
-                for credit in credits_res.json():
+            
+            # 1. Fetch Cast Credits
+            cast_res = session.get(f"https://api.tvmaze.com/people/{person_id}/castcredits?embed=show", timeout=5)
+            if cast_res.ok:
+                for credit in cast_res.json():
                     show = credit['_embedded']['show']
-                    if show['name'].lower() not in seen_titles:
+                    title_low = show['name'].lower()
+                    if title_low not in seen_titles:
                         show['cast'] = [person_name]
                         score_data = calculate_match_score(show, profile)
                         results.append(format_suggestion(show, score_data))
-                        seen_titles.add(show['name'].lower())
+                        seen_titles.add(title_low)
                     if len(results) >= limit: break
-    except: pass
+            
+            # 2. Fetch Crew Credits (Directors, Creators)
+            if len(results) < limit:
+                crew_res = session.get(f"https://api.tvmaze.com/people/{person_id}/crewcredits?embed=show", timeout=5)
+                if crew_res.ok:
+                    for credit in crew_res.json():
+                        show = credit['_embedded']['show']
+                        title_low = show['name'].lower()
+                        if title_low not in seen_titles:
+                            show['cast'] = [person_name]
+                            score_data = calculate_match_score(show, profile)
+                            results.append(format_suggestion(show, score_data))
+                            seen_titles.add(title_low)
+                        if len(results) >= limit: break
+    except Exception as e:
+        print(f"Error fetching for {person_name}: {e}")
     return results
 
-def fetch_by_genre(genre_name, profile, seen_titles, limit):
+def fetch_by_genre(genre_name, profile, seen_titles, limit, session=None):
+    if session is None: session = requests.Session()
     results = []
     try:
-        genre_res = requests.get(f"https://api.tvmaze.com/search/shows?q={genre_name}", timeout=5)
+        genre_res = session.get(f"https://api.tvmaze.com/search/shows?q={requests.utils.quote(genre_name)}", timeout=5)
         if genre_res.ok:
             for item in genre_res.json():
                 show = item['show']
-                if show['name'].lower() not in seen_titles:
+                title_low = show['name'].lower()
+                if title_low not in seen_titles:
                     score_data = calculate_match_score(show, profile)
                     results.append(format_suggestion(show, score_data))
-                    seen_titles.add(show['name'].lower())
+                    seen_titles.add(title_low)
                 if len(results) >= limit: break
     except: pass
     return results
