@@ -173,6 +173,12 @@ def create_app():
         if rating >= 0:
             media.in_watchlist = True
             
+        # Add to watch history if specifically thumbed up/down (indicating it was watched)
+        if rating in [1, -1]:
+            from models import WatchHistory
+            history = WatchHistory(media_id=media.id, platform='Discovered')
+            db.session.add(history)
+            
         db.session.commit()
         return jsonify({'message': 'External media saved to library/watchlist'}), 200
 
@@ -190,6 +196,7 @@ def create_app():
         from flask import request
         from utils.omdb import OMDBClient
         from utils.recommender import get_user_taste_profile, calculate_match_score
+        from models import Media
         
         query = request.args.get('q')
         if not query:
@@ -204,13 +211,18 @@ def create_app():
         profile = get_user_taste_profile()
         score_data = calculate_match_score(data, profile)
         
+        # Check if we already have this in our DB
+        local_media = Media.query.filter_by(title=data.get('Title')).first()
+        
         return jsonify({
+            'id': local_media.id if local_media else None,
             'title': data.get('Title'),
             'year': data.get('Year'),
             'genre': data.get('Genre'),
             'plot': data.get('Plot'),
             'poster': data.get('Poster'),
-            'match': score_data
+            'match': score_data,
+            'local_rating': local_media.user_rating if local_media else 0
         })
 
     @app.route('/api/suggestions', methods=['GET'])
