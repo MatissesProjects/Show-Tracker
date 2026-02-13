@@ -31,6 +31,30 @@
             System Status: <span class='font-bold text-green-500'>{{ health.status }}</span>
         </div>
 
+        <!-- Recommendations -->
+        <div class='mt-8 p-6 bg-white rounded shadow border-t-4 border-green-500' v-if='suggestions && suggestions.length > 0'>
+            <h2 class='text-xl font-semibold mb-6'>Recommended for You</h2>
+            <div class='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6'>
+                <div v-for='s in suggestions' :key='s.title' class='flex flex-col bg-gray-50 rounded border overflow-hidden hover:shadow-md transition-shadow'>
+                    <img v-if='s.poster !== "N/A"' :src='s.poster' class='w-full h-48 object-cover' />
+                    <div class='p-4 flex-1 flex flex-col'>
+                        <div class='flex justify-between items-start'>
+                            <h3 class='font-bold text-sm'>{{ s.title }}</h3>
+                            <span class='bg-indigo-600 text-white text-[10px] px-2 py-1 rounded font-black'>{{ s.match.total_score }}</span>
+                        </div>
+                        <p class='text-[10px] text-gray-500 mt-1'>{{ s.year }} • {{ s.genre }}</p>
+                        <div class='mt-auto pt-4'>
+                            <div class='flex flex-wrap gap-1'>
+                                <span v-for='reason in s.match.breakdown.slice(0, 2)' :key='reason' class='text-[9px] bg-white border px-1.5 py-0.5 rounded text-gray-600'>
+                                    {{ reason }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Discovery Search -->
         <div class='mt-8 p-6 bg-white rounded shadow border-t-4 border-indigo-500'>
             <h2 class='text-xl font-semibold mb-4'>Discover New Media</h2>
@@ -156,6 +180,7 @@
                 const media = ref([])
                 const people = ref([])
                 const genres = ref([])
+                const suggestions = ref([])
                 const selectedFile = ref(null)
                 const uploading = ref(false)
                 const enriching = ref(false)
@@ -164,6 +189,16 @@
                 const searchQuery = ref('')
                 const searchResult = ref(null)
                 const searchError = ref('')
+
+                const fetchSuggestions = async () => {
+                    try {
+                        const res = await fetch('http://localhost:5000/api/suggestions')
+                        const data = await res.json()
+                        suggestions.value = Array.isArray(data) ? data : []
+                    } catch (e) {
+                        console.error('Failed to fetch suggestions', e)
+                    }
+                }
 
                 const searchNewMedia = async () => {
                     if (!searchQuery.value) return
@@ -227,7 +262,8 @@
                         })
                         if (res.ok) {
                             await fetchMedia()
-                            await fetchPeopleStats() // Update stats as they now factor in liked talent
+                            await fetchPeopleStats()
+                            await fetchSuggestions() // Refresh suggestions based on new rating
                         }
                     } catch (e) {
                         console.error('Failed to update rating', e)
@@ -275,6 +311,7 @@
                         await fetchMedia()
                         await fetchPeopleStats()
                         await fetchGenreStats()
+                        await fetchSuggestions()
                     } catch (e) {
                         uploadStatus.value = 'Error: Could not reach the server'
                     } finally {
@@ -289,12 +326,13 @@
                         await fetchMedia()
                         await fetchPeopleStats()
                         await fetchGenreStats()
+                        await fetchSuggestions()
                     } catch (e) {
                         console.error('API not reachable', e)
                     }
                 })
 
-                return { title, message, health, media, people, genres, selectedFile, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia }
+                return { title, message, health, media, people, genres, suggestions, selectedFile, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia }
             }
         }).mount('#app')
     </script>

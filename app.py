@@ -143,6 +143,15 @@ def create_app():
             'poster': data.get('Poster'),
             'match': score_data
         })
+
+    @app.route('/api/suggestions', methods=['GET'])
+    def get_suggestions():
+        from utils.recommender import get_proactive_suggestions
+        try:
+            suggestions = get_proactive_suggestions(db)
+            return jsonify(suggestions), 200
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
         
     return app
 

@@ -94,3 +94,51 @@ def calculate_match_score(media_data, profile):
         'total_score': round(score, 1),
         'breakdown': details
     }
+
+def get_proactive_suggestions(db_instance, limit=5):
+    """
+    Finds new media suggestions by searching for works of top talent
+    that aren't in the user's history.
+    """
+    from utils.omdb import OMDBClient
+    from models import Media
+    
+    profile = get_user_taste_profile()
+    # Get top 3 people by show count
+    top_talent = sorted(profile['people'].items(), key=lambda x: x[1], reverse=True)[:3]
+    
+    client = OMDBClient()
+    suggestions = []
+    seen_titles = set([m.title.lower() for m in db_instance.session.query(Media.title).all()])
+    
+    for person, count in top_talent:
+        # Search OMDb for this person (using them as a search term)
+        # Note: OMDb search 's' returns a list, but 't' returns one. 
+        # We'll use the search endpoint for candidates.
+        params = {'apikey': client.api_key, 's': person, 'type': 'movie'}
+        try:
+            res = requests.get(client.base_url, params=params)
+            data = res.json()
+            if data.get('Response') == 'True':
+                for item in data.get('Search', []):
+                    title = item.get('Title')
+                    if title.lower() not in seen_titles:
+                        # Get full details for scoring
+                        full_data = client.search_by_title(title)
+                        if full_data:
+                            score_data = calculate_match_score(full_data, profile)
+                            suggestions.append({
+                                'title': full_data.get('Title'),
+                                'year': full_data.get('Year'),
+                                'genre': full_data.get('Genre'),
+                                'poster': full_data.get('Poster'),
+                                'match': score_data
+                            })
+                            seen_titles.add(title.lower())
+                    if len(suggestions) >= limit: break
+        except:
+            continue
+        if len(suggestions) >= limit: break
+            
+    # Sort by total score
+    return sorted(suggestions, key=lambda x: x['match']['total_score'], reverse=True)[:limit]
