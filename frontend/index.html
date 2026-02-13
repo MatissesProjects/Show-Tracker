@@ -66,15 +66,22 @@
                         <tr>
                             <th class='p-3'>Title</th>
                             <th class='p-3'>Type</th>
-                            <th class='p-3'>Release Date</th>
+                            <th class='p-3'>Genre</th>
+                            <th class='p-3'>Rating</th>
                             <th class='p-3'>Status</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr v-for='item in media' :key='item.id' class='border-b'>
-                            <td class='p-3'>{{ item.title }}</td>
+                            <td class='p-3 font-medium'>{{ item.title }}</td>
                             <td class='p-3 capitalize'>{{ item.media_type }}</td>
-                            <td class='p-3'>{{ item.release_date || 'N/A' }}</td>
+                            <td class='p-3 text-xs text-gray-600'>{{ item.genres || 'N/A' }}</td>
+                            <td class='p-3'>
+                                <span v-if='item.rating && item.rating !== "N/A"' class='bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded text-xs font-bold'>
+                                    {{ item.rating }}
+                                </span>
+                                <span v-else class='text-gray-400'>-</span>
+                            </td>
                             <td class='p-3'>
                                 <span v-if='item.media_type !== "unknown"' class='text-green-600 font-medium'>Enriched</span>
                                 <span v-else class='text-gray-400 italic'>Pending</span>

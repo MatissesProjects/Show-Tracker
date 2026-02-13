@@ -67,7 +67,10 @@ def create_app():
             'id': m.id,
             'title': m.title,
             'media_type': m.media_type,
-            'release_date': m.release_date
+            'release_date': m.release_date,
+            'rating': m.rating,
+            'genres': m.genres,
+            'runtime': m.runtime
         } for m in media_list])
 
     @app.route('/api/stats/people', methods=['GET'])

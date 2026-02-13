@@ -17,6 +17,9 @@ class Media(db.Model):
     media_type = db.Column(db.String(50)) # 'movie' or 'tv'
     release_date = db.Column(db.String(20))
     overview = db.Column(db.Text)
+    genres = db.Column(db.String(200))
+    rating = db.Column(db.String(10))
+    runtime = db.Column(db.String(50))
     
     # Relationship via association object
     person_memberships = db.relationship("MediaPerson", back_populates="media", cascade="all, delete-orphan")

@@ -38,6 +38,9 @@ def apply_metadata(media, data, db_instance):
     media.media_type = data.get('Type')
     media.release_date = data.get('Released')
     media.overview = data.get('Plot')
+    media.genres = data.get('Genre')
+    media.rating = data.get('imdbRating')
+    media.runtime = data.get('Runtime')
     
     # Process Actors
     actors = data.get('Actors', '').split(', ')
