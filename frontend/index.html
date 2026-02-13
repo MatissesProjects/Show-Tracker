@@ -116,7 +116,7 @@
             </section>
 
             <!-- Deep Discovery Intelligence Section -->
-            <section class='mb-20'>
+            <section class='mb-20' v-if="aiAvailable">
                 <div class='flex justify-between items-end mb-10'>
                     <div class='flex flex-col gap-2'>
                         <h3 class='text-3xl font-black text-white uppercase tracking-tighter flex items-center gap-4'>
@@ -423,11 +423,21 @@
                 const selectedSuggestion = ref(null);
                 const deepDiscoveries = ref([]);
                 const discovering = ref(false);
+                const aiAvailable = ref(false);
 
                 const openModal = (suggestion) => { 
                     selectedSuggestion.value = suggestion;
                 };
                 const closeModal = () => { selectedSuggestion.value = null; };
+
+                const checkAiStatus = async () => {
+                    try {
+                        const res = await fetch('http://localhost:5000/api/ai/status');
+                        const data = await res.json();
+                        aiAvailable.value = data.available;
+                        if (aiAvailable.value) runDeepDiscovery();
+                    } catch (e) { aiAvailable.value = false; }
+                };
 
                 const runDeepDiscovery = async () => {
                     discovering.value = true;
@@ -658,11 +668,11 @@
                         const res = await fetch('http://localhost:5000/api/health');
                         health.value = await res.json();
                         fetchMedia(); fetchPeopleStats(); fetchGenreStats(); fetchWatchlist(); fetchSuggestions();
-                        runDeepDiscovery();
+                        checkAiStatus();
                     } catch (e) {}
                 });
 
-                return { health, media, totalMedia, people, genres, suggestions, refreshingSuggestions, loadingWatchlist, activeFilters, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal, fetchSuggestions, toggleFilter, isFilterActive, clearFilters, watchlist, toggleWatchlist, addToWatchlist, rateSearchResult, selectedSuggestion, openModal, closeModal, openWatchlistModal, getTrailerUrl, handleImageError, refreshMedia, rateExternalFromModal, addToWatchlistFromModal, createBackup, deepDiscoveries, discovering, runDeepDiscovery }
+                return { health, media, totalMedia, people, genres, suggestions, refreshingSuggestions, loadingWatchlist, activeFilters, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal, fetchSuggestions, toggleFilter, isFilterActive, clearFilters, watchlist, toggleWatchlist, addToWatchlist, rateSearchResult, selectedSuggestion, openModal, closeModal, openWatchlistModal, getTrailerUrl, handleImageError, refreshMedia, rateExternalFromModal, addToWatchlistFromModal, createBackup, deepDiscoveries, discovering, runDeepDiscovery, aiAvailable, checkAiStatus }
             }
         }).mount('#app')
     </script>

@@ -146,6 +146,13 @@ def create_app():
         db.session.commit()
         return jsonify({'message': 'Rating updated'}), 200
 
+    @app.route('/api/ai/status', methods=['GET'])
+    def ai_status():
+        from utils.ai_analyst import AIAnalyst
+        analyst = AIAnalyst()
+        available = analyst.check_availability()
+        return jsonify({'available': available}), 200
+
     @app.route('/api/ai/deep-discovery', methods=['GET'])
     def deep_discovery():
         from models import Media

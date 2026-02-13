@@ -1,11 +1,26 @@
 
 import requests
 import json
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class AIAnalyst:
-    def __init__(self, base_url="http://localhost:11434", model="qwen3:8b"):
-        self.base_url = f"{base_url}/api/generate"
+    def __init__(self, base_url=None, model="qwen3:8b"):
+        self.base_url = (base_url or os.getenv('OLLAMA_URL', 'http://localhost:11434')).rstrip('/')
+        self.generate_url = f"{self.base_url}/api/generate"
         self.model = model
+
+    def check_availability(self):
+        """Checks if the Ollama server is reachable and configured."""
+        if not os.getenv('OLLAMA_URL'):
+            return False
+        try:
+            response = requests.get(self.base_url, timeout=2)
+            return response.status_code == 200
+        except:
+            return False
 
     def generate_insight(self, media_title, media_data, user_profile):
         """Generates a personalized reasoning for why the user would like a specific media."""
@@ -34,7 +49,7 @@ class AIAnalyst:
 
         try:
             response = requests.post(
-                self.base_url,
+                self.generate_url,
                 json={
                     "model": self.model,
                     "prompt": prompt,
@@ -68,7 +83,7 @@ class AIAnalyst:
         
         try:
             response = requests.post(
-                self.base_url,
+                self.generate_url,
                 json={
                     "model": self.model,
                     "prompt": prompt,
