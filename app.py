@@ -54,7 +54,15 @@ def create_app():
     @app.route('/api/media', methods=['GET'])
     def get_media():
         from models import Media
-        media_list = Media.query.order_by(Media.id.desc()).limit(100).all()
+        from sqlalchemy import func
+        # Group by title to show unique shows/movies
+        # We take the max(id) to get the most recent ones
+        subquery = db.session.query(
+            func.max(Media.id).label('max_id')
+        ).group_by(Media.title).subquery()
+        
+        media_list = Media.query.filter(Media.id.in_(subquery)).order_by(Media.id.desc()).limit(100).all()
+        
         return jsonify([{
             'id': m.id,
             'title': m.title,

@@ -13,22 +13,20 @@ def enrich_media_data(db_instance):
     # Get all unique unknown media
     unknown_media = db_instance.session.query(Media).filter_by(media_type='unknown').all()
     
-    # Track unique base titles to avoid redundant API calls
-    processed_titles = {}
-    
-    enriched_count = 0
+    # Group by cleaned title first to minimize API calls
+    title_groups = {}
     for media in unknown_media:
         base_title = clean_netflix_title(media.title)
-        
-        if base_title in processed_titles:
-            # Reuse data if we've already fetched it for this series
-            apply_metadata(media, processed_titles[base_title], db_instance)
-            continue
-            
+        if base_title not in title_groups:
+            title_groups[base_title] = []
+        title_groups[base_title].append(media)
+    
+    enriched_count = 0
+    for base_title, media_items in title_groups.items():
         data = client.search_by_title(base_title)
         if data:
-            processed_titles[base_title] = data
-            apply_metadata(media, data, db_instance)
+            for media in media_items:
+                apply_metadata(media, data, db_instance)
             enriched_count += 1
             
     db_instance.session.commit()

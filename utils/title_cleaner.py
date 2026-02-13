@@ -2,11 +2,31 @@ import re
 
 def clean_netflix_title(title):
     """
-    Groups episodes into a single series name.
-    Example: "Stranger Things: Season 1: Chapter One" -> "Stranger Things"
-    Example: "Inception" -> "Inception"
+    Groups episodes into a single series name more aggressively.
+    Handles:
+    - Series: Season 1: Episode
+    - Series: Part 1: Episode
+    - Series - Season 1 - Episode
+    - Movie (Year)
     """
-    # Netflix titles often use ":" or " - " to separate series, seasons, and episodes
-    # We take everything before the first colon or dash
-    parts = re.split(r'[:\-]', title)
-    return parts[0].strip()
+    # Remove everything after common separators used for seasons/episodes
+    # Matches ": Season", ": Part", ": Volume", " - Season", etc.
+    patterns = [
+        r'[:\-]\s+Season.*',
+        r'[:\-]\s+Part.*',
+        r'[:\-]\s+Volume.*',
+        r'[:\-]\s+Limited Series.*',
+        r'[:\-]\s+Chapter.*',
+        r'[:\-]\s+Series.*'
+    ]
+    
+    cleaned = title
+    for pattern in patterns:
+        cleaned = re.split(pattern, cleaned, flags=re.IGNORECASE)[0]
+    
+    # Also just split on the first colon if it's likely a series format
+    # but keep the whole thing if it's a short title (to avoid breaking movies like "7:19")
+    if ":" in cleaned and len(cleaned.split(":")[0]) > 3:
+        cleaned = cleaned.split(":")[0]
+        
+    return cleaned.strip()
