@@ -68,6 +68,13 @@ You must run both servers simultaneously:
    ```
    Access the dashboard at `http://localhost:5001`.
 
+### 📂 How to get your data
+1.  Go to [Netflix Account Settings](https://www.netflix.com/YourAccount).
+2.  In the **Profile & Parental Controls** section, select a profile.
+3.  Click **Viewing Activity**.
+4.  Click **Download All** at the bottom of the page.
+5.  Upload the resulting `NetflixViewingHistory.csv` into the dashboard using the **IMPORT FEED** button.
+
 ---
 
 ## 📂 Project Architecture
