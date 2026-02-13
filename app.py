@@ -192,7 +192,8 @@ def create_app():
     def get_suggestions():
         from utils.recommender import get_proactive_suggestions
         try:
-            suggestions = get_proactive_suggestions(db)
+            # Increased limit for a better carousel experience
+            suggestions = get_proactive_suggestions(db, limit=20)
             return jsonify(suggestions), 200
         except Exception as e:
             return jsonify({'error': str(e)}), 500
