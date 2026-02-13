@@ -20,6 +20,13 @@ def create_app():
         import models
         db.create_all()
     
+    @app.errorhandler(Exception)
+    def handle_exception(e):
+        app.logger.error(f"Server Error: {str(e)}")
+        import traceback
+        app.logger.error(traceback.format_exc())
+        return jsonify({"error": "Internal Server Error", "details": str(e)}), 500
+
     @app.route('/api/health')
     def health_check():
         return {'status': 'healthy', 'message': 'Show Tracker API is running'}
