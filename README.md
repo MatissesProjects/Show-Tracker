@@ -24,14 +24,20 @@ A tool to analyze viewing history and discover media based on shared actors, dir
    ```
 
 ### Running the Application
+You need to run both the backend and the frontend servers simultaneously.
+
 1. **Start the Flask Backend:**
    ```powershell
-   python app.py
+   .\venv\Scripts\python.exe app.py
    ```
    The API will be available at `http://localhost:5000`.
 
-2. **Open the Frontend:**
-   Open `frontend/index.html` in your web browser.
+2. **Start the Frontend Server:**
+   In a new terminal:
+   ```powershell
+   python -m http.server 5001 --directory frontend
+   ```
+   Then open `http://localhost:5001` in your web browser.
 
 ### Running Tests
 Execute the following command to run the backend test suite:

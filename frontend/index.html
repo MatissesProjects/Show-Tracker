@@ -55,7 +55,7 @@
         </div>
 
         <!-- Media List -->
-        <div class='mt-8 p-6 bg-white rounded shadow' v-if="media.length > 0">
+        <div class='mt-8 p-6 bg-white rounded shadow' v-if="media && media.length > 0">
             <div class='flex justify-between items-center mb-4'>
                 <h2 class='text-xl font-semibold'>Recently Added Media</h2>
                 <button @click='fetchMedia' class='text-indigo-600 hover:underline text-sm'>Refresh List</button>
