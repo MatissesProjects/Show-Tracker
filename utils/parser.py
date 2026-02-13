@@ -2,9 +2,8 @@ import csv
 import io
 from datetime import datetime
 from models import Media, WatchHistory
-from app import db
 
-def parse_netflix_history(csv_file_content):
+def parse_netflix_history(csv_file_content, db):
     """
     Parses Netflix 'ViewingActivity.csv'. 
     Netflix format: Title, Date

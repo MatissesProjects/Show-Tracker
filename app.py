@@ -37,7 +37,7 @@ def create_app():
             return jsonify({'error': 'No selected file'}), 400
             
         try:
-            count = parse_netflix_history(file.read())
+            count = parse_netflix_history(file.read(), db)
             return jsonify({'message': f'Successfully imported {count} new entries'}), 200
         except Exception as e:
             return jsonify({'error': str(e)}), 500
