@@ -53,14 +53,7 @@ def create_app():
 
     @app.route('/api/media', methods=['GET'])
     def get_media():
-        from models import Media
-        from sqlalchemy import func
-        # Group by title to show unique shows/movies
-        # We take the max(id) to get the most recent ones
-        subquery = db.session.query(
-            func.max(Media.id).label('max_id')
-        ).group_by(Media.title).subquery()
-        
+        # ... (previous code) ...
         media_list = Media.query.filter(Media.id.in_(subquery)).order_by(Media.id.desc()).limit(100).all()
         
         return jsonify([{
@@ -69,6 +62,15 @@ def create_app():
             'media_type': m.media_type,
             'release_date': m.release_date
         } for m in media_list])
+
+    @app.route('/api/stats/people', methods=['GET'])
+    def get_people_stats():
+        from utils.analyzer import get_top_people
+        try:
+            stats = get_top_people()
+            return jsonify(stats), 200
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
         
     return app
 

@@ -31,6 +31,29 @@
             System Status: <span class='font-bold text-green-500'>{{ health.status }}</span>
         </div>
 
+        <!-- Top Talent -->
+        <div class='mt-8 grid grid-cols-1 md:grid-cols-2 gap-8' v-if='people.length > 0'>
+            <div class='p-6 bg-white rounded shadow'>
+                <h2 class='text-xl font-semibold mb-4'>Top People in Your History</h2>
+                <ul class='divide-y'>
+                    <li v-for='p in people' :key='p.name + p.role' class='py-2 flex justify-between'>
+                        <div>
+                            <span class='font-medium'>{{ p.name }}</span>
+                            <span class='ml-2 text-xs text-gray-500 uppercase'>{{ p.role }}</span>
+                        </div>
+                        <span class='bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full text-xs font-bold'>
+                            {{ p.count }} plays
+                        </span>
+                    </li>
+                </ul>
+            </div>
+            
+            <div class='p-6 bg-white rounded shadow flex flex-col justify-center items-center text-center'>
+                <h3 class='text-lg font-medium text-gray-400'>Analysis Insight</h3>
+                <p class='mt-2 text-gray-600 italic'>You tend to watch a lot of works by your top people. We can use this to suggest what's next.</p>
+            </div>
+        </div>
+
         <!-- Media List -->
         <div class='mt-8 p-6 bg-white rounded shadow' v-if="media.length > 0">
             <div class='flex justify-between items-center mb-4'>
@@ -70,10 +93,20 @@
                 const message = ref('Welcome to your personal media analyzer.')
                 const health = ref(null)
                 const media = ref([])
+                const people = ref([])
                 const selectedFile = ref(null)
                 const uploading = ref(false)
                 const enriching = ref(false)
                 const uploadStatus = ref('')
+
+                const fetchPeopleStats = async () => {
+                    try {
+                        const res = await fetch('http://localhost:5000/api/stats/people')
+                        people.value = await res.json()
+                    } catch (e) {
+                        console.error('Failed to fetch people stats', e)
+                    }
+                }
 
                 const fetchMedia = async () => {
                     try {
@@ -135,6 +168,7 @@
                         const res = await fetch('http://localhost:5000/api/health')
                         health.value = await res.json()
                         await fetchMedia()
+                        await fetchPeopleStats()
                     } catch (e) {
                         console.error('API not reachable', e)
                     }
