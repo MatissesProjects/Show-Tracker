@@ -172,7 +172,10 @@ def format_suggestion(show, score_data):
     return {
         'title': title,
         'year': show.get('premiered', '')[:4],
+        'media_type': 'series',
         'genre': ', '.join(show.get('genres', [])),
+        'runtime': f"{show.get('runtime', '')} min" if show.get('runtime') else None,
+        'total_seasons': None, # TVMaze doesn't provide this in the search response easily
         'poster': (show.get('image') or {}).get('medium'),
         'match': score_data,
         'on_netflix': 'Netflix' in [network, web_channel],

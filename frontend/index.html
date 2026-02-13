@@ -83,15 +83,17 @@
                     <!-- Actual Watchlist Items -->
                     <div v-for='item in watchlist' :key='item.id' @click="openWatchlistModal(item)" class='bg-slate-800/40 rounded-[2rem] border border-white/5 overflow-hidden flex flex-col group relative shadow-2xl hover:border-amber-500/30 transition-all cursor-pointer'>
                         <div class='relative aspect-[2/3]'>
-                            <img v-if='item.poster_url && item.poster_url !== "N/A"' :src='item.poster_url' class='w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity' />
+                            <img v-if='item.poster_url && item.poster_url !== "N/A"' :src='item.poster_url' @error="handleImageError(item)" class='w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity' />
                             <div v-else class='w-full h-full bg-slate-900 flex items-center justify-center text-slate-700 font-black text-[10px] p-4 text-center'>
                                 {{ item.title }}
                             </div>
                             <div class='absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent'></div>
 
-                            <button @click.stop='toggleWatchlist(item.id)' class='absolute top-3 right-3 bg-slate-900/80 backdrop-blur-md p-2 rounded-xl text-amber-500 opacity-0 group-hover:opacity-100 hover:scale-110 transition-all border border-white/10 shadow-xl'>
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" /></svg>
-                            </button>
+                            <div class='absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all'>
+                                <button @click.stop='toggleWatchlist(item.id)' class='bg-slate-900/80 backdrop-blur-md p-2 rounded-xl text-amber-500 hover:scale-110 transition-all border border-white/10 shadow-xl' title="Remove from Watchlist">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
 
                             <div class='absolute bottom-4 left-4 right-4'>
                                 <div class='flex justify-between items-end'>
@@ -194,7 +196,14 @@
                             <div class='relative shrink-0'><img v-if='searchResult.poster !== "N/A"' :src='searchResult.poster' class='w-56 h-auto rounded-[2rem] shadow-2xl border border-white/10' /><div class='absolute -top-6 -right-6 bg-indigo-600 text-white w-20 h-20 rounded-full flex items-center justify-center text-3xl font-black shadow-2xl border-8 border-[#1e293b]'>{{ Math.round(searchResult.match.total_score) }}</div></div>
                             <div class='flex-1'>
                                 <div class='flex justify-between items-start'>
-                                    <div><h4 class='text-4xl font-black text-white leading-none'>{{ searchResult.title }} <span class='text-slate-600 font-bold text-2xl ml-2'>{{ searchResult.year }}</span></h4><p class='text-indigo-400 font-black text-xs tracking-[0.4em] uppercase mt-4'>{{ searchResult.genre }}</p></div>
+                                    <div>
+                                        <h4 class='text-4xl font-black text-white leading-none'>{{ searchResult.title }} <span class='text-slate-600 font-bold text-2xl ml-2'>{{ searchResult.year }}</span></h4>
+                                        <p class='text-indigo-400 font-black text-xs tracking-[0.4em] uppercase mt-4'>
+                                            {{ searchResult.genre }}
+                                            <span v-if="searchResult.runtime && searchResult.runtime !== 'N/A'" class="text-slate-500 ml-2">• {{ searchResult.runtime }}</span>
+                                            <span v-if="searchResult.total_seasons && searchResult.total_seasons !== 'N/A'" class="text-amber-500 ml-2">• {{ searchResult.total_seasons }} SEASONS</span>
+                                        </p>
+                                    </div>
                                     <div class='flex gap-2'>
                                         <button @click='rateSearchResult(2)' :class='(searchResult.id ? searchResult.local_rating : 0) === 2 ? "text-rose-500 bg-rose-500/10" : "text-slate-500 bg-white/5"' class='p-3 rounded-2xl border border-white/5' title='LOVE IT'><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd" /></svg></button>
                                         <button @click='rateSearchResult(1)' :class='(searchResult.id ? searchResult.local_rating : 0) === 1 ? "text-green-500 bg-green-500/10" : "text-slate-500 bg-white/5"' class='p-3 rounded-2xl border border-white/5'><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20"><path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" /></svg></button>
@@ -223,8 +232,15 @@
                             <table class='w-full text-left'>
                                 <tbody class='divide-y divide-white/5'>
                                     <tr v-for='item in media' :key='item.id' @click="openWatchlistModal(item)" class='hover:bg-indigo-500/5 transition-colors group cursor-pointer'>
-                                        <td class='px-12 py-10'><div class='flex items-center gap-6'><img v-if='item.poster_url && item.poster_url !== "N/A"' :src='item.poster_url' class='w-12 h-16 object-cover rounded-lg shadow-lg border border-white/5' /><div v-else class='w-12 h-16 bg-slate-800 rounded-lg border border-white/5 flex items-center justify-center text-[8px] font-black text-slate-600 text-center uppercase p-1'>{{ item.title }}</div><div><p class='font-black text-white text-xl tracking-tight'>{{ item.title }}</p><p class='text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mt-1'>{{ item.media_type }}</p></div></div></td>
-                                        <td class='px-12 py-10'><p class='text-xs font-bold text-slate-300'>{{ item.genres || '...' }}</p><p class='text-[10px] font-black text-slate-600 mt-2 uppercase tracking-widest'>{{ item.release_date || 'Unknown' }}</p></td>
+                                        <td class='px-12 py-10'><div class='flex items-center gap-6'><img v-if='item.poster_url && item.poster_url !== "N/A"' :src='item.poster_url' @error="handleImageError(item)" class='w-12 h-16 object-cover rounded-lg shadow-lg border border-white/5' /><div v-else class='w-12 h-16 bg-slate-800 rounded-lg border border-white/5 flex items-center justify-center text-[8px] font-black text-slate-600 text-center uppercase p-1'>{{ item.title }}</div><div><p class='font-black text-white text-xl tracking-tight'>{{ item.title }}</p><p class='text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mt-1'>{{ item.media_type }}</p></div></div></td>
+                                        <td class='px-12 py-10'>
+                                            <p class='text-xs font-bold text-slate-300'>{{ item.genres || '...' }}</p>
+                                            <p class='text-[10px] font-black text-slate-600 mt-2 uppercase tracking-widest'>
+                                                {{ item.release_date || 'Unknown' }}
+                                                <span v-if="item.runtime && item.runtime !== 'N/A'"> • {{ item.runtime }}</span>
+                                                <span v-if="item.total_seasons && item.total_seasons !== 'N/A'" class="text-amber-500/60 ml-1">• {{ item.total_seasons }} SEASONS</span>
+                                            </p>
+                                        </td>
                                         <td class='px-12 py-10 text-center'><span v-if='item.rating && item.rating !== "N/A"' class='bg-amber-500/10 text-amber-500 border border-amber-500/20 px-4 py-2 rounded-xl text-xs font-black shadow-lg shadow-amber-500/5'>{{ item.rating }}</span><span v-else class='text-slate-700 font-black opacity-20'>--</span></td>
                                         <td class='px-12 py-10 text-right'><div class='flex justify-end items-center gap-8'><div class='flex gap-3' @click.stop>
                                             <a :href="getTrailerUrl(item.title)" target="_blank" class="p-2 rounded-xl text-slate-500 hover:text-indigo-400 transition-colors" title="Watch Trailer">
@@ -277,7 +293,11 @@
                             <div class="flex justify-between items-start gap-4">
                                 <div>
                                     <h2 class="text-4xl font-black text-white leading-tight uppercase tracking-tighter">{{ selectedSuggestion.title }}</h2>
-                                    <p class="text-indigo-400 font-black text-sm tracking-[0.3em] mt-2">{{ selectedSuggestion.year }} • {{ selectedSuggestion.genre }}</p>
+                                    <p class="text-indigo-400 font-black text-sm tracking-[0.3em] mt-2">
+                                        {{ selectedSuggestion.year }} • {{ selectedSuggestion.genre }}
+                                        <span v-if="selectedSuggestion.runtime && selectedSuggestion.runtime !== 'N/A'"> • {{ selectedSuggestion.runtime }}</span>
+                                        <span v-if="selectedSuggestion.total_seasons && selectedSuggestion.total_seasons !== 'N/A'"> • {{ selectedSuggestion.total_seasons }} SEASONS</span>
+                                    </p>
                                 </div>
                                 <div class="bg-indigo-600 text-white w-16 h-16 rounded-full flex items-center justify-center text-xl font-black shadow-xl border-4 border-slate-800">
                                     {{ Math.round(selectedSuggestion.match.total_score) }}
@@ -344,6 +364,37 @@
 
                 const openModal = (suggestion) => { selectedSuggestion.value = suggestion; };
                 const closeModal = () => { selectedSuggestion.value = null; };
+
+                const refreshedItems = new Set();
+                const handleImageError = (item) => {
+                    if (!refreshedItems.has(item.id)) {
+                        refreshedItems.add(item.id);
+                        refreshMedia(item.id);
+                    } else {
+                        item.poster_url = null; // Fallback to title placeholder if refresh already tried
+                    }
+                };
+
+                const refreshMedia = async (mediaId) => {
+                    try {
+                        const res = await fetch(`http://localhost:5000/api/media/${mediaId}/refresh`, { method: 'POST' });
+                        if (res.ok) {
+                            const data = await res.json();
+                            // Update the item in local state
+                            const wItem = watchlist.value.find(i => i.id === mediaId);
+                            if (wItem) wItem.poster_url = data.poster_url;
+                            const mItem = media.value.find(i => i.id === mediaId);
+                            if (mItem) mItem.poster_url = data.poster_url;
+                            if (searchResult.value && searchResult.value.id === mediaId) searchResult.value.poster = data.poster_url;
+                        } else {
+                            // If refresh fails, ensure placeholder is shown
+                            const wItem = watchlist.value.find(i => i.id === mediaId);
+                            if (wItem) wItem.poster_url = null;
+                            const mItem = media.value.find(i => i.id === mediaId);
+                            if (mItem) mItem.poster_url = null;
+                        }
+                    } catch (e) {}
+                };
 
                 const getTrailerUrl = (title) => {
                     return `https://www.youtube.com/results?search_query=${encodeURIComponent(title)}+official+trailer`;
@@ -511,7 +562,7 @@
                     } catch (e) {}
                 });
 
-                return { health, media, totalMedia, people, genres, suggestions, refreshingSuggestions, loadingWatchlist, activeFilters, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal, fetchSuggestions, toggleFilter, isFilterActive, clearFilters, watchlist, toggleWatchlist, addToWatchlist, rateSearchResult, selectedSuggestion, openModal, closeModal, openWatchlistModal, getTrailerUrl, rateExternalFromModal, addToWatchlistFromModal, createBackup }
+                return { health, media, totalMedia, people, genres, suggestions, refreshingSuggestions, loadingWatchlist, activeFilters, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal, fetchSuggestions, toggleFilter, isFilterActive, clearFilters, watchlist, toggleWatchlist, addToWatchlist, rateSearchResult, selectedSuggestion, openModal, closeModal, openWatchlistModal, getTrailerUrl, handleImageError, refreshMedia, rateExternalFromModal, addToWatchlistFromModal, createBackup }
             }
         }).mount('#app')
     </script>

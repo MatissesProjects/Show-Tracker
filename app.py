@@ -107,6 +107,7 @@ def create_app():
                 'rating': m.rating,
                 'genres': m.genres,
                 'runtime': m.runtime,
+                'total_seasons': m.total_seasons,
                 'poster_url': m.poster_url,
                 'user_rating': m.user_rating,
                 'in_watchlist': m.in_watchlist or False
@@ -170,14 +171,40 @@ def create_app():
         return jsonify({
             'id': m.id,
             'title': m.title,
+            'media_type': m.media_type,
             'year': m.release_date[:4] if m.release_date else '????',
             'genre': m.genres,
+            'runtime': m.runtime,
+            'total_seasons': m.total_seasons,
             'poster': m.poster_url,
             'summary': m.overview or "No description available.",
             'match': score_data,
             'youtube_url': f"https://www.youtube.com/results?search_query={m.title.replace(' ', '+')}+funny+moments+clips",
             'on_netflix': False 
         })
+
+    @app.route('/api/media/<int:media_id>/refresh', methods=['POST'])
+    def refresh_media_data(media_id):
+        from models import Media
+        from utils.omdb import OMDBClient
+        from utils.enricher import apply_metadata
+        from utils.title_cleaner import clean_netflix_title
+        
+        media = Media.query.get_or_404(media_id)
+        client = OMDBClient()
+        
+        # Try with current title first, then cleaned title
+        data = client.search_by_title(media.title)
+        if not data:
+            base_title = clean_netflix_title(media.title)
+            data = client.search_by_title(base_title)
+            
+        if data:
+            apply_metadata(media, data, db)
+            db.session.commit()
+            return jsonify({'message': 'Metadata refreshed', 'poster_url': media.poster_url}), 200
+        
+        return jsonify({'error': 'Could not find updated data for this title'}), 404
 
     @app.route('/api/media/<int:media_id>/watchlist', methods=['POST'])
     def toggle_watchlist(media_id):
@@ -198,6 +225,8 @@ def create_app():
             'media_type': m.media_type,
             'genres': m.genres,
             'rating': m.rating,
+            'runtime': m.runtime,
+            'total_seasons': m.total_seasons,
             'poster_url': m.poster_url
         } for m in items]), 200
 
@@ -277,8 +306,11 @@ def create_app():
         return jsonify({
             'id': local_media.id if local_media else None,
             'title': data.get('Title'),
+            'media_type': data.get('Type'),
             'year': data.get('Year'),
             'genre': data.get('Genre'),
+            'runtime': data.get('Runtime'),
+            'total_seasons': data.get('totalSeasons'),
             'plot': data.get('Plot'),
             'poster': data.get('Poster'),
             'match': score_data,

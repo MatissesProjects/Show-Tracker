@@ -48,7 +48,13 @@ def apply_metadata(media, data, db_instance):
     media.genres = data.get('Genre')
     media.rating = data.get('imdbRating')
     media.runtime = data.get('Runtime')
-    media.poster_url = data.get('Poster')
+    media.total_seasons = data.get('totalSeasons')
+    
+    poster = data.get('Poster')
+    if poster and poster != 'N/A':
+        media.poster_url = poster.strip().replace(' ', '')
+    else:
+        media.poster_url = poster
     
     # Process Actors
     actors = data.get('Actors', '').split(', ')
