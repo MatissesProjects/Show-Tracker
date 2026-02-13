@@ -1,53 +1,77 @@
-# Show Tracker
+# 🎬 Show Tracker | Media Intelligence Dashboard
 
-A tool to analyze viewing history and discover media based on shared actors, directors, and creators.
+Show Tracker is a personal data-intelligence tool that transforms your raw streaming history into a powerful recommendation engine. By analyzing thousands of data points from your viewing habits, it identifies your "Talent Core" and "Genre DNA" to help you discover what to watch next with cinematic precision.
 
-## Tech Stack
-- **Backend:** Python (Flask) + SQLite (SQLAlchemy)
-- **Frontend:** Vue.js (3.x) + Tailwind CSS
+![Show Tracker UI](https://img.shields.io/badge/UI-Dark_Mode-blueviolet)
+![Engine](https://img.shields.io/badge/Intelligence-TVmaze_%2B_OMDb-indigo)
+![Database](https://img.shields.io/badge/Storage-SQLite-blue)
 
-## Getting Started
+## 🚀 Key Features
+
+### 1. Deep History Ingestion
+*   **Netflix Integration:** Import your full `ViewingActivity.csv` and watch as thousands of entries are instantly processed.
+*   **Smart Deduplication:** Automatically groups 5,000+ individual episode entries into clean, manageable unique series records.
+
+### 2. Media Intelligence (Enrichment)
+*   **Metadata Harvesting:** Connects to OMDb to pull rich metadata, including Cast, Directors, Genres, IMDb Ratings, and Plot Summaries.
+*   **Taste Profiling:** Ranks your "Top Talent" by how many unique shows/films you've watched them in, not just episode counts.
+
+### 3. Proactive Discovery Engine
+*   **Match Scoring:** Every potential show is given a "Compatibility Score" based on your specific history and "Thumbs Up" feedback.
+*   **Interactive Carousel:** A sleek, horizontal discovery section that proactively finds new works featuring your favorite actors.
+*   **Netflix Tagging:** Automatically identifies if a recommendation is currently available on Netflix.
+
+### 4. Interactive Analytics
+*   **Drill-Down Filtering:** Click any actor or genre in your sidebar to instantly pivot the recommendation engine to that specific talent or category.
+*   **Training Mode:** Use the Thumbs Up/Down system to refine your profile. "Liked" talent receive a +30 score boost in future suggestions.
+
+---
+
+## 🛠️ Tech Stack
+*   **Backend:** Python Flask + SQLAlchemy (SQLite)
+*   **Frontend:** Vue.js 3 (Composition API) + Tailwind CSS
+*   **Intelligence:** TVmaze API (Proactive Search) & OMDb API (Metadata)
+
+---
+
+## 🏁 Getting Started
 
 ### Prerequisites
-- Python 3.8+
+*   Python 3.8+
+*   An OMDb API Key (Free at [omdbapi.com](http://www.omdbapi.com/apikey.aspx))
 
 ### Setup
-1. **Create Virtual Environment:**
+1. **Initialize Environment:**
    ```powershell
    python -m venv venv
    .\venv\Scripts\Activate.ps1
-   ```
-
-2. **Install Dependencies:**
-   ```powershell
    pip install -r requirements.txt
    ```
 
-### Running the Application
-You need to run both the backend and the frontend servers simultaneously.
-
-1. **Start the Flask Backend:**
-   ```powershell
-   .\venv\Scripts\python.exe app.py
+2. **Configure API:**
+   Create a `.env` file in the root and add your key:
+   ```env
+   OMDB_API_KEY=your_key_here
    ```
-   The API will be available at `http://localhost:5000`.
 
-2. **Start the Frontend Server:**
-   In a new terminal:
+### Running the System
+You must run both servers simultaneously:
+
+1. **Start Intelligence API (Backend):**
+   ```powershell
+   python app.py
+   ```
+
+2. **Start Cinematic UI (Frontend):**
    ```powershell
    python -m http.server 5001 --directory frontend
    ```
-   Then open `http://localhost:5001` in your web browser.
+   Access the dashboard at `http://localhost:5001`.
 
-### Running Tests
-Execute the following command to run the backend test suite:
-```powershell
-.\venv\Scripts\python.exe -m pytest
-```
+---
 
-## Project Structure
-- `app.py`: Flask application entry point.
-- `models.py`: Database schema (Media, People, Watch History).
-- `frontend/`: Vue.js frontend code.
-- `tests/`: Pytest suite for backend logic.
-- `conductor/`: Project planning and track management.
+## 📂 Project Architecture
+*   `utils/recommender.py`: The heart of the scoring and cross-referencing logic.
+*   `utils/parser.py`: Handles complex Netflix CSV parsing and title normalization.
+*   `utils/enricher.py`: Manages the data pipeline between OMDb and the local DB.
+*   `models.py`: Relational schema for Media, People, and Watch History.
