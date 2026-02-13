@@ -76,66 +76,78 @@ def calculate_match_score(media_data, profile):
         
     return {'total_score': round(score, 1), 'breakdown': details}
 
-def get_proactive_suggestions(db_instance, limit=20, target_person=None, target_genre=None):
+def get_proactive_suggestions(db_instance, limit=20, target_people=None, target_genres=None):
     """
-    Enhanced engine with filtering for specific talent or genres.
+    Enhanced engine with multi-filter support.
     """
     profile = get_user_taste_profile()
     suggestions = []
     seen_titles = set([m.title.lower() for m in db_instance.session.query(Media.title).all()])
     
-    search_terms = []
-    if target_person:
-        search_terms = [target_person]
-    elif target_genre:
-        # TVmaze doesn't have a direct genre endpoint, we search for shows with that keyword
-        try:
-            genre_res = requests.get(f"https://api.tvmaze.com/search/shows?q={target_genre}", timeout=5)
-            if genre_res.ok:
-                for item in genre_res.json():
-                    show = item['show']
-                    title = show['name']
-                    if title.lower() not in seen_titles:
-                        score_data = calculate_match_score(show, profile)
-                        suggestions.append(format_suggestion(show, score_data))
-                        seen_titles.add(title.lower())
-                    if len(suggestions) >= limit: return suggestions
-        except: pass
-        return suggestions
+    search_people = target_people if target_people else []
+    search_genres = target_genres if target_genres else []
 
+    # Strategy 1: Filtered Search (Explicit selections)
+    if search_people or search_genres:
+        # Search by specific people
+        for person_name in search_people:
+            suggestions.extend(fetch_by_person(person_name, profile, seen_titles, limit))
+        
+        # Search by specific genres
+        for genre_name in search_genres:
+            suggestions.extend(fetch_by_genre(genre_name, profile, seen_titles, limit))
+            
+        # If we have both, only keep those that match BOTH where possible? 
+        # For now, let's just return the combined set, sorted by score.
     else:
         # Auto-mode: pick from liked names or top talent
         liked_people = db_instance.session.query(Person.name).filter(Person.id.in_(profile['liked_people_ids'])).all()
         liked_names = [p[0] for p in liked_people]
-        search_terms = liked_names if liked_names else sorted(profile['people'].items(), key=lambda x: x[1], reverse=True)[:15]
-        if search_terms and isinstance(search_terms[0], tuple): search_terms = [p[0] for p in search_terms]
-        random.shuffle(search_terms)
+        auto_search = liked_names if liked_names else sorted(profile['people'].items(), key=lambda x: x[1], reverse=True)[:15]
+        if auto_search and isinstance(auto_search[0], tuple): auto_search = [p[0] for p in auto_search]
+        random.shuffle(auto_search)
+        
+        for person_name in auto_search[:8]:
+            suggestions.extend(fetch_by_person(person_name, profile, seen_titles, limit))
+            if len(suggestions) >= limit: break
 
-    for person_name in search_terms[:8]:
-        try:
-            person_res = requests.get(f"https://api.tvmaze.com/search/people?q={person_name}", timeout=5)
-            if not person_res.ok or not person_res.json(): continue
-            
+    # Remove duplicates and sort by match score
+    unique_suggestions = {s['title']: s for s in suggestions}.values()
+    return sorted(unique_suggestions, key=lambda x: x['match']['total_score'], reverse=True)[:limit]
+
+def fetch_by_person(person_name, profile, seen_titles, limit):
+    results = []
+    try:
+        person_res = requests.get(f"https://api.tvmaze.com/search/people?q={person_name}", timeout=5)
+        if person_res.ok and person_res.json():
             person_id = person_res.json()[0]['person']['id']
             credits_res = requests.get(f"https://api.tvmaze.com/people/{person_id}/castcredits?embed=show", timeout=5)
-            if not credits_res.ok: continue
-            
-            credits = credits_res.json()
-            random.shuffle(credits)
+            if credits_res.ok:
+                for credit in credits_res.json():
+                    show = credit['_embedded']['show']
+                    if show['name'].lower() not in seen_titles:
+                        show['cast'] = [person_name]
+                        score_data = calculate_match_score(show, profile)
+                        results.append(format_suggestion(show, score_data))
+                        seen_titles.add(show['name'].lower())
+                    if len(results) >= limit: break
+    except: pass
+    return results
 
-            for credit in credits:
-                show = credit['_embedded']['show']
-                title = show['name']
-                if title.lower() not in seen_titles:
-                    show['cast'] = [person_name]
+def fetch_by_genre(genre_name, profile, seen_titles, limit):
+    results = []
+    try:
+        genre_res = requests.get(f"https://api.tvmaze.com/search/shows?q={genre_name}", timeout=5)
+        if genre_res.ok:
+            for item in genre_res.json():
+                show = item['show']
+                if show['name'].lower() not in seen_titles:
                     score_data = calculate_match_score(show, profile)
-                    suggestions.append(format_suggestion(show, score_data))
-                    seen_titles.add(title.lower())
-                if len(suggestions) >= limit: break
-        except: continue
-        if len(suggestions) >= limit: break
-
-    return sorted(suggestions, key=lambda x: x['match']['total_score'], reverse=True)
+                    results.append(format_suggestion(show, score_data))
+                    seen_titles.add(show['name'].lower())
+                if len(results) >= limit: break
+    except: pass
+    return results
 
 def format_suggestion(show, score_data):
     network = (show.get('network') or {}).get('name', '')

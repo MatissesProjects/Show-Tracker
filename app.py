@@ -193,12 +193,12 @@ def create_app():
         from flask import request
         from utils.recommender import get_proactive_suggestions
         
-        person = request.args.get('person')
-        genre = request.args.get('genre')
+        # Support multiple parameters like ?person=A&person=B
+        people = request.args.getlist('person')
+        genres = request.args.getlist('genre')
         
         try:
-            # Pass filters to the engine
-            suggestions = get_proactive_suggestions(db, limit=20, target_person=person, target_genre=genre)
+            suggestions = get_proactive_suggestions(db, limit=20, target_people=people, target_genres=genres)
             return jsonify(suggestions), 200
         except Exception as e:
             return jsonify({'error': str(e)}), 500
