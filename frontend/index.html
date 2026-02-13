@@ -434,7 +434,17 @@
                 const fetchGenreStats = async () => { try { const res = await fetch('http://localhost:5000/api/stats/genres'); const data = await res.json(); genres.value = Array.isArray(data) ? data : []; } catch (e) { genres.value = []; } };
                 const fetchPeopleStats = async () => { try { const res = await fetch('http://localhost:5000/api/stats/people'); const data = await res.json(); people.value = Array.isArray(data) ? data : []; } catch (e) { people.value = []; } };
                 const fetchMedia = async () => { try { const res = await fetch(`http://localhost:5000/api/media?page=${currentPage.value}&per_page=15`); const data = await res.json(); media.value = data.items; totalPages.value = data.pages; totalMedia.value = data.total; } catch (e) {} };
-                const changePage = async (page) => { if (page >= 1 && page <= totalPages.value) { currentPage.value = page; await fetchMedia(); } };
+                const changePage = async (page) => { 
+                    if (page >= 1 && page <= totalPages.value) { 
+                        currentPage.value = page; 
+                        await fetchMedia(); 
+                        // Scroll to top of the library section
+                        const librarySection = document.querySelector('section.glass.rounded-\\[3rem\\].shadow-2xl');
+                        if (librarySection) {
+                            librarySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    } 
+                };
                 const visiblePages = computed(() => { const pages = []; let start = Math.max(1, currentPage.value - 2); let end = Math.min(totalPages.value, start + 4); if (end - start < 4) start = Math.max(1, end - 4); for (let i = start; i <= end; i++) if (i > 0) pages.push(i); return pages; });
 
                 const rateMedia = async (mediaId, rating) => {
