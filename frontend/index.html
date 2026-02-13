@@ -9,8 +9,23 @@
     <div id='app' class='container mx-auto p-8'>
         <h1 class='text-4xl font-bold text-indigo-600'>{{ title }}</h1>
         <p class='mt-4 text-gray-700'>{{ message }}</p>
-        <div class='mt-8 p-4 bg-white rounded shadow' v-if='health'>
-            Status: <span class='font-bold text-green-500'>{{ health.status }}</span>
+        
+        <!-- Upload Section -->
+        <div class='mt-8 p-6 bg-white rounded shadow'>
+            <h2 class='text-xl font-semibold mb-4'>Import Netflix History</h2>
+            <div class='flex items-center gap-4'>
+                <input type='file' @change='handleFileUpload' class='block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100' />
+                <button @click='uploadFile' :disabled='!selectedFile || uploading' class='bg-indigo-600 text-white px-4 py-2 rounded disabled:bg-gray-400'>
+                    {{ uploading ? 'Uploading...' : 'Upload' }}
+                </button>
+            </div>
+            <p v-if='uploadStatus' class='mt-4 text-sm' :class='uploadStatus.includes("error") ? "text-red-500" : "text-green-500"'>
+                {{ uploadStatus }}
+            </p>
+        </div>
+
+        <div class='mt-8 p-4 bg-white rounded shadow border-l-4 border-green-500' v-if='health'>
+            System Status: <span class='font-bold text-green-500'>{{ health.status }}</span>
         </div>
     </div>
     <script>
@@ -20,6 +35,39 @@
                 const title = ref('Show Tracker')
                 const message = ref('Welcome to your personal media analyzer.')
                 const health = ref(null)
+                const selectedFile = ref(null)
+                const uploading = ref(false)
+                const uploadStatus = ref('')
+
+                const handleFileUpload = (event) => {
+                    selectedFile.value = event.target.files[0]
+                }
+
+                const uploadFile = async () => {
+                    if (!selectedFile.value) return
+                    uploading.value = true
+                    uploadStatus.value = ''
+                    
+                    const formData = new FormData()
+                    formData.append('file', selectedFile.value)
+
+                    try {
+                        const res = await fetch('http://localhost:5000/api/upload-netflix', {
+                            method: 'POST',
+                            body: formData
+                        })
+                        const result = await res.json()
+                        if (res.ok) {
+                            uploadStatus.value = result.message
+                        } else {
+                            uploadStatus.value = `Error: ${result.error}`
+                        }
+                    } catch (e) {
+                        uploadStatus.value = 'Error: Could not reach the server'
+                    } finally {
+                        uploading.value = false
+                    }
+                }
 
                 onMounted(async () => {
                     try {
@@ -30,7 +78,7 @@
                     }
                 })
 
-                return { title, message, health }
+                return { title, message, health, selectedFile, uploading, uploadStatus, handleFileUpload, uploadFile }
             }
         }).mount('#app')
     </script>

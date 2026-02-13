@@ -23,6 +23,24 @@ def create_app():
     @app.route('/api/health')
     def health_check():
         return {'status': 'healthy', 'message': 'Show Tracker API is running'}
+
+    @app.route('/api/upload-netflix', methods=['POST'])
+    def upload_netflix():
+        from flask import request, jsonify
+        from utils.parser import parse_netflix_history
+        
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file part'}), 400
+            
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No selected file'}), 400
+            
+        try:
+            count = parse_netflix_history(file.read())
+            return jsonify({'message': f'Successfully imported {count} new entries'}), 200
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
         
     return app
 
