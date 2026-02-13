@@ -145,7 +145,10 @@ def create_app():
         return jsonify([{
             'id': m.id,
             'title': m.title,
-            'media_type': m.media_type
+            'media_type': m.media_type,
+            'genres': m.genres,
+            'rating': m.rating,
+            'poster_url': m.poster_url
         } for m in items]), 200
 
     @app.route('/api/media/rate-external', methods=['POST'])

@@ -20,6 +20,7 @@ class Media(db.Model):
     genres = db.Column(db.String(200))
     rating = db.Column(db.String(10))
     runtime = db.Column(db.String(50))
+    poster_url = db.Column(db.String(500))
     user_rating = db.Column(db.Integer, default=0) # 1 for thumbs up, -1 for thumbs down, 0 for neutral
     in_watchlist = db.Column(db.Boolean, default=False)
     

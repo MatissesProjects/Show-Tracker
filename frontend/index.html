@@ -64,17 +64,36 @@
 
             <!-- Watchlist Section -->
             <section class='mb-20' v-if='watchlist.length > 0'>
-                <h3 class='text-2xl font-black text-white mb-8 flex items-center gap-3'>
+                <h3 class='text-3xl font-black text-white mb-10 flex items-center gap-4 uppercase tracking-tighter'>
                     <span class='w-2 h-8 bg-amber-500 rounded-full'></span>
                     Your Watchlist
                 </h3>
-                <div class='grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6'>
-                    <div v-for='item in watchlist' :key='item.id' class='bg-slate-800/50 rounded-2xl border border-white/5 p-4 flex flex-col items-center text-center group relative'>
-                        <button @click='toggleWatchlist(item.id)' class='absolute top-2 right-2 text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity'>×</button>
-                        <div class='w-full aspect-[2/3] bg-slate-900 rounded-xl mb-3 overflow-hidden'>
-                            <div class='w-full h-full flex items-center justify-center text-slate-700 font-black text-xs px-4'>{{ item.title }}</div>
+                <div class='grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8'>
+                    <div v-for='item in watchlist' :key='item.id' class='bg-slate-800/40 rounded-[2rem] border border-white/5 overflow-hidden flex flex-col group relative shadow-2xl hover:border-amber-500/30 transition-all'>
+                        <div class='relative aspect-[2/3]'>
+                            <img v-if='item.poster_url && item.poster_url !== "N/A"' :src='item.poster_url' class='w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity' />
+                            <div v-else class='w-full h-full bg-slate-900 flex items-center justify-center text-slate-700 font-black text-[10px] p-4 text-center'>
+                                {{ item.title }}
+                            </div>
+                            <div class='absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent'></div>
+                            
+                            <!-- Remove Button -->
+                            <button @click='toggleWatchlist(item.id)' class='absolute top-3 right-3 bg-slate-900/80 backdrop-blur-md p-2 rounded-xl text-amber-500 opacity-0 group-hover:opacity-100 hover:scale-110 transition-all border border-white/10 shadow-xl'>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+
+                            <div class='absolute bottom-4 left-4 right-4'>
+                                <div class='flex justify-between items-end'>
+                                    <p class='text-[10px] font-black text-amber-500 uppercase tracking-widest truncate mr-2'>{{ item.genres ? item.genres.split(',')[0] : 'Media' }}</p>
+                                    <div v-if='item.rating && item.rating !== "N/A"' class='bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.5 rounded shadow-lg'>
+                                        {{ item.rating }}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <p class='text-xs font-bold text-white line-clamp-1'>{{ item.title }}</p>
+                        <div class='p-4 text-center'>
+                            <p class='text-xs font-black text-white truncate px-2 uppercase tracking-wide'>{{ item.title }}</p>
+                        </div>
                     </div>
                 </div>
             </section>
