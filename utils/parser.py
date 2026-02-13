@@ -2,6 +2,7 @@ import csv
 import io
 from datetime import datetime
 from models import Media, WatchHistory
+from utils.title_cleaner import clean_netflix_title
 
 def parse_netflix_history(csv_file_content, db):
     """
@@ -19,7 +20,6 @@ def parse_netflix_history(csv_file_content, db):
         if not title or not date_str:
             continue
             
-        from utils.title_cleaner import clean_netflix_title
         base_title = clean_netflix_title(title)
             
         try:

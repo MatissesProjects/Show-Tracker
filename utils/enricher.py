@@ -2,6 +2,7 @@ from database import db
 from models import Media, Person, MediaPerson
 from utils.omdb import OMDBClient
 from utils.title_cleaner import clean_netflix_title
+from sqlalchemy import or_
 
 def enrich_media_data(db_instance):
     """
@@ -11,7 +12,6 @@ def enrich_media_data(db_instance):
     client = OMDBClient()
     
     # Get media that is 'unknown' OR missing genre/rating data
-    from sqlalchemy import or_
     to_enrich = db_instance.session.query(Media).filter(
         or_(
             Media.media_type == 'unknown',

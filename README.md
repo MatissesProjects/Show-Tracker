@@ -73,7 +73,7 @@ You must run both servers simultaneously:
 2.  select a profile. - Or if there are multiple select Manage Profiles and select yours
 3.  Click **Watch history**.
 4.  Click **Download All** at the bottom of the page.
-5.  Upload the resulting `NetflixViewingHistory.csv` into the dashboard using the **IMPORT FEED** button.
+5.  Upload the resulting `NetflixViewingHistory.csv` into the dashboard using the **Import History** button.
 
 ---
 
