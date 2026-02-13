@@ -26,7 +26,7 @@ def create_app():
 
     @app.route('/api/upload-netflix', methods=['POST'])
     def upload_netflix():
-        from flask import request, jsonify
+        from flask import request
         from utils.parser import parse_netflix_history
         
         if 'file' not in request.files:
@@ -53,7 +53,14 @@ def create_app():
 
     @app.route('/api/media', methods=['GET'])
     def get_media():
-        # ... (previous code) ...
+        from models import Media
+        from sqlalchemy import func
+        # Group by title to show unique shows/movies
+        # We take the max(id) to get the most recent ones
+        subquery = db.session.query(
+            func.max(Media.id).label('max_id')
+        ).group_by(Media.title).subquery()
+        
         media_list = Media.query.filter(Media.id.in_(subquery)).order_by(Media.id.desc()).limit(100).all()
         
         return jsonify([{
