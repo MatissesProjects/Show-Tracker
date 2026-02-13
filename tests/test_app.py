@@ -1,5 +1,5 @@
 import pytest
-from models import Media, Person, WatchHistory
+from models import Media, Person, MediaPerson, WatchHistory
 from app import db
 
 def test_health_check(client):
@@ -9,30 +9,53 @@ def test_health_check(client):
     assert response.json['status'] == 'healthy'
 
 def test_media_model(app):
-    """Test creating a Media entry."""
+    """Test creating a Media entry with all fields."""
     with app.app_context():
-        media = Media(title="Inception", media_type="movie")
+        media = Media(
+            title="Inception", 
+            media_type="movie", 
+            tmdb_id=27205, 
+            release_date="2010-07-15",
+            overview="A thief who steals corporate secrets..."
+        )
         db.session.add(media)
         db.session.commit()
         
-        saved_media = Media.query.filter_by(title="Inception").first()
-        assert saved_media is not None
-        assert saved_media.title == "Inception"
+        saved = Media.query.filter_by(tmdb_id=27205).first()
+        assert saved.title == "Inception"
+        assert saved.media_type == "movie"
 
-def test_media_person_relationship(app):
-    """Test the Many-to-Many relationship between Media and Person."""
+def test_media_person_roles(app):
+    """Test that a person can have multiple roles (Actor and Director)."""
     with app.app_context():
         movie = Media(title="Interstellar", media_type="movie")
-        actor = Person(name="Matthew McConaughey")
+        nolan = Person(name="Christopher Nolan")
         
-        movie.people.append(actor)
-        db.session.add(movie)
-        db.session.add(actor)
+        # Add Nolan as Director
+        role1 = MediaPerson(media=movie, person=nolan, role="Director")
+        # Add Nolan as Writer (hypothetically)
+        role2 = MediaPerson(media=movie, person=nolan, role="Writer")
+        
+        db.session.add_all([movie, nolan, role1, role2])
         db.session.commit()
         
         saved_movie = Media.query.filter_by(title="Interstellar").first()
-        assert len(saved_movie.people) == 1
-        assert saved_movie.people[0].name == "Matthew McConaughey"
+        assert len(saved_movie.person_memberships) == 2
+        roles = [m.role for m in saved_movie.person_memberships]
+        assert "Director" in roles
+        assert "Writer" in roles
+
+def test_watch_history_link(app):
+    """Test that watch history links correctly to media."""
+    with app.app_context():
+        movie = Media(title="The Matrix", media_type="movie")
+        db.session.add(movie)
+        db.session.commit()
         
-        saved_person = Person.query.filter_by(name="Matthew McConaughey").first()
-        assert len(saved_person.media_works.all()) == 1
+        entry = WatchHistory(media_id=movie.id, platform="Netflix")
+        db.session.add(entry)
+        db.session.commit()
+        
+        saved_entry = WatchHistory.query.first()
+        assert saved_entry.media.title == "The Matrix"
+        assert saved_entry.platform == "Netflix"
