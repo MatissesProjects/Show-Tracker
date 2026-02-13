@@ -21,7 +21,7 @@ class Media(db.Model):
     rating = db.Column(db.String(10))
     runtime = db.Column(db.String(50))
     poster_url = db.Column(db.String(500))
-    user_rating = db.Column(db.Integer, default=0, index=True) # 1 for thumbs up, -1 for thumbs down, 0 for neutral
+    user_rating = db.Column(db.Integer, default=0, index=True) # 2: Love, 1: Like, -1: Dislike, 0: Neutral
     in_watchlist = db.Column(db.Boolean, default=False, index=True)
     
     # Relationship via association object

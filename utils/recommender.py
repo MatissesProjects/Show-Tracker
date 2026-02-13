@@ -5,54 +5,77 @@ from models import Media, MediaPerson, Person
 from database import db
 
 def get_user_taste_profile():
-    """Aggregates the user's preferences into a weight map."""
+    """Aggregates the user's preferences into a high-fidelity weight map."""
     top_people = get_top_people(limit=100)
     genre_stats = get_genre_stats()
+    
+    # Tiered weight identification
+    loved_media = Media.query.filter(Media.user_rating == 2).all()
     liked_media = Media.query.filter(Media.user_rating == 1).all()
+    
+    loved_people_ids = [p[0] for p in db.session.query(MediaPerson.person_id).join(Media).filter(Media.user_rating == 2).distinct().all()]
     liked_people_ids = [p[0] for p in db.session.query(MediaPerson.person_id).join(Media).filter(Media.user_rating == 1).distinct().all()]
     disliked_people_ids = [p[0] for p in db.session.query(MediaPerson.person_id).join(Media).filter(Media.user_rating == -1).distinct().all()]
+
     people_weights = {p['name']: p['count'] for p in top_people}
     if genre_stats:
         max_genre_count = max(g['count'] for g in genre_stats)
         genre_weights = {g['name']: (g['count'] / max_genre_count) * 40 for g in genre_stats}
     else:
         genre_weights = {}
+        
     return {
         'people': people_weights,
         'genres': genre_weights,
+        'loved_people_ids': loved_people_ids,
         'liked_people_ids': liked_people_ids,
         'disliked_people_ids': disliked_people_ids,
+        'loved_media': loved_media,
         'liked_media': liked_media
     }
 
 def calculate_match_score(media_data, profile):
-    """Enhanced scoring with weighted similarity."""
+    """Enhanced scoring with tiered weights and Creator/Director awareness."""
     score = 0
     details = []
+    
     actors = media_data.get('Actors') or media_data.get('cast') or ''
+    director = media_data.get('Director') or ''
+    writer = media_data.get('Writer') or ''
     genres_list = media_data.get('genres', []) if isinstance(media_data.get('genres'), list) else (media_data.get('Genre', '').split(', ') if media_data.get('Genre') else [])
     rating = media_data.get('imdbRating') or (media_data.get('rating') or {}).get('average') or 0
-    people_in_media = []
-    if isinstance(actors, list):
-        people_in_media = actors
+
+    # Talent & Creator Pool
+    talent_pool = []
+    if isinstance(actors, list): talent_pool.extend(actors)
     else:
         if '_embedded' in media_data and 'cast' in media_data['_embedded']:
-            people_in_media = [c['person']['name'] for c in media_data['_embedded']['cast']]
+            talent_pool.extend([c['person']['name'] for c in media_data['_embedded']['cast']])
         else:
-            people_in_media = [p.split(' (')[0].strip() for p in actors.split(', ') if p]
-    for person_name in set(people_in_media):
+            talent_pool.extend([p.split(' (')[0].strip() for p in actors.split(', ') if p])
+    
+    # Add Creators
+    talent_pool.extend([p.strip() for p in director.split(',') if p])
+    talent_pool.extend([p.strip() for p in writer.split(',') if p])
+
+    for person_name in set(talent_pool):
         person_obj = Person.query.filter_by(name=person_name).first()
         if person_obj:
             if person_obj.id in profile['disliked_people_ids']:
-                score -= 50
-                details.append(f"Disliked Talent: {person_name} (-50)")
+                score -= 60
+                details.append(f"Avoid: {person_name} (Disliked) (-60)")
                 continue
-            if person_obj.id in profile['liked_people_ids']:
+            
+            if person_obj.id in profile['loved_people_ids']:
+                score += 80
+                details.append(f"Starring/Created by {person_name} (LOVED) (+80)")
+            elif person_obj.id in profile['liked_people_ids']:
                 score += 40
-                details.append(f"Starring {person_name} (Favorite) (+40)")
+                details.append(f"Starring/Created by {person_name} (Liked) (+40)")
+
         if person_name in profile['people']:
             count = profile['people'][person_name]
-            points = 20 if count > 5 else 10
+            points = 25 if count > 5 else 12
             score += points
             details.append(f"Frequent Talent: {person_name} (+{points})")
     genre_match_count = 0
@@ -83,8 +106,11 @@ def get_proactive_suggestions(db_instance, limit=20, target_people=None, target_
         for p in (target_people or []): suggestions.extend(fetch_by_person(p, profile, seen_titles, limit))
         for g in (target_genres or []): suggestions.extend(fetch_by_genre(g, profile, seen_titles, limit))
     else:
-        if profile['liked_media']:
-            sample_likes = random.sample(profile['liked_media'], min(len(profile['liked_media']), 5))
+        # Strategy A: Similarity via 'Loved' & 'Liked' Media DNA
+        # Prioritize loved items for the sample if available
+        dna_sample_pool = profile['loved_media'] + profile['liked_media']
+        if dna_sample_pool:
+            sample_likes = random.sample(dna_sample_pool, min(len(dna_sample_pool), 8))
             for media in sample_likes:
                 actors = [mp.person.name for mp in media.person_memberships if mp.role == 'Actor'][:3]
                 genres = (media.genres or "").split(', ')
@@ -93,8 +119,10 @@ def get_proactive_suggestions(db_instance, limit=20, target_people=None, target_
                     for c in candidates:
                         c_genres = c['genre'].split(', ')
                         if any(g in c_genres for g in genres):
-                            c['match']['total_score'] += 20
-                            c['match']['breakdown'].insert(0, f"DNA Similarity to {media.title} (+20)")
+                            # Boost based on whether the DNA source was loved or liked
+                            boost = 40 if media.user_rating == 2 else 20
+                            c['match']['total_score'] += boost
+                            c['match']['breakdown'].insert(0, f"DNA Similarity to {media.title} (+{boost})")
                             suggestions.append(c)
         top_talent = sorted(profile['people'].items(), key=lambda x: x[1], reverse=True)[:10]
         random.shuffle(top_talent)
