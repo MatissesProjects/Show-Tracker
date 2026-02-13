@@ -19,6 +19,9 @@ def parse_netflix_history(csv_file_content, db):
         if not title or not date_str:
             continue
             
+        from utils.title_cleaner import clean_netflix_title
+        base_title = clean_netflix_title(title)
+            
         try:
             watch_date = datetime.strptime(date_str, '%m/%d/%y')
         except ValueError:
@@ -28,9 +31,9 @@ def parse_netflix_history(csv_file_content, db):
                 continue
 
         # Use db.session.query for more robust context handling
-        media = db.session.query(Media).filter_by(title=title).first()
+        media = db.session.query(Media).filter_by(title=base_title).first()
         if not media:
-            media = Media(title=title, media_type='unknown')
+            media = Media(title=base_title, media_type='unknown')
             db.session.add(media)
             db.session.flush()
 
