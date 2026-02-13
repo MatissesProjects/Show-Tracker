@@ -22,13 +22,44 @@
                     {{ enriching ? 'Enriching...' : 'Enrich with OMDb' }}
                 </button>
             </div>
-            <p v-if='uploadStatus' class='mt-4 text-sm' :class='uploadStatus.includes("error") ? "text-red-500" : "text-green-500"'>
+            <p v-if='uploadStatus' class='mt-4 text-sm' :class='uploadStatus.includes("Error") ? "text-red-500" : "text-green-500"'>
                 {{ uploadStatus }}
             </p>
         </div>
 
         <div class='mt-8 p-4 bg-white rounded shadow border-l-4 border-green-500' v-if='health'>
             System Status: <span class='font-bold text-green-500'>{{ health.status }}</span>
+        </div>
+
+        <!-- Media List -->
+        <div class='mt-8 p-6 bg-white rounded shadow' v-if="media.length > 0">
+            <div class='flex justify-between items-center mb-4'>
+                <h2 class='text-xl font-semibold'>Recently Added Media</h2>
+                <button @click='fetchMedia' class='text-indigo-600 hover:underline text-sm'>Refresh List</button>
+            </div>
+            <div class='overflow-x-auto'>
+                <table class='min-w-full text-left text-sm'>
+                    <thead class='bg-gray-50'>
+                        <tr>
+                            <th class='p-3'>Title</th>
+                            <th class='p-3'>Type</th>
+                            <th class='p-3'>Release Date</th>
+                            <th class='p-3'>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for='item in media' :key='item.id' class='border-b'>
+                            <td class='p-3'>{{ item.title }}</td>
+                            <td class='p-3 capitalize'>{{ item.media_type }}</td>
+                            <td class='p-3'>{{ item.release_date || 'N/A' }}</td>
+                            <td class='p-3'>
+                                <span v-if='item.media_type !== "unknown"' class='text-green-600 font-medium'>Enriched</span>
+                                <span v-else class='text-gray-400 italic'>Pending</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
     <script>
@@ -38,33 +69,29 @@
                 const title = ref('Show Tracker')
                 const message = ref('Welcome to your personal media analyzer.')
                 const health = ref(null)
+                const media = ref([])
                 const selectedFile = ref(null)
                 const uploading = ref(false)
                 const enriching = ref(false)
                 const uploadStatus = ref('')
 
-                const handleFileUpload = (event) => {
-                    selectedFile.value = event.target.files[0]
+                const fetchMedia = async () => {
+                    try {
+                        const res = await fetch('http://localhost:5000/api/media')
+                        media.value = await res.json()
+                    } catch (e) {
+                        console.error('Failed to fetch media', e)
+                    }
                 }
 
-                const enrichData = async () => {
-                    enriching.value = true
-                    uploadStatus.value = 'Enriching data... this may take a moment.'
-                    try {
-                        const res = await fetch('http://localhost:5000/api/enrich', { method: 'POST' })
-                        const result = await res.json()
-                        uploadStatus.value = result.message
-                    } catch (e) {
-                        uploadStatus.value = 'Error: Could not reach the server'
-                    } finally {
-                        enriching.value = false
-                    }
+                const handleFileUpload = (event) => {
+                    selectedFile.value = event.target.files[0]
                 }
 
                 const uploadFile = async () => {
                     if (!selectedFile.value) return
                     uploading.value = true
-                    uploadStatus.value = ''
+                    uploadStatus.value = 'Uploading and parsing... please wait.'
                     
                     const formData = new FormData()
                     formData.append('file', selectedFile.value)
@@ -77,6 +104,7 @@
                         const result = await res.json()
                         if (res.ok) {
                             uploadStatus.value = result.message
+                            await fetchMedia()
                         } else {
                             uploadStatus.value = `Error: ${result.error}`
                         }
@@ -87,16 +115,32 @@
                     }
                 }
 
+                const enrichData = async () => {
+                    enriching.value = true
+                    uploadStatus.value = 'Enriching data... This processes all unknown titles and can take a minute.'
+                    try {
+                        const res = await fetch('http://localhost:5000/api/enrich', { method: 'POST' })
+                        const result = await res.json()
+                        uploadStatus.value = result.message
+                        await fetchMedia()
+                    } catch (e) {
+                        uploadStatus.value = 'Error: Could not reach the server'
+                    } finally {
+                        enriching.value = false
+                    }
+                }
+
                 onMounted(async () => {
                     try {
                         const res = await fetch('http://localhost:5000/api/health')
                         health.value = await res.json()
+                        await fetchMedia()
                     } catch (e) {
                         console.error('API not reachable', e)
                     }
                 })
 
-                return { title, message, health, selectedFile, uploading, uploadStatus, handleFileUpload, uploadFile }
+                return { title, message, health, media, selectedFile, uploading, enriching, uploadStatus, handleFileUpload, uploadFile, enrichData, fetchMedia }
             }
         }).mount('#app')
     </script>
