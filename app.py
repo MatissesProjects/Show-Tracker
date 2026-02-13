@@ -89,6 +89,15 @@ def create_app():
             return jsonify(stats), 200
         except Exception as e:
             return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/stats/genres', methods=['GET'])
+    def get_genre_stats_api():
+        from utils.analyzer import get_genre_stats
+        try:
+            stats = get_genre_stats()
+            return jsonify(stats), 200
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
         
     return app
 
