@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Show Tracker</title>
+    <script src='https://unpkg.com/vue@3/dist/vue.global.js'></script>
+    <script src='https://cdn.tailwindcss.com'></script>
+</head>
+<body class='bg-gray-100'>
+    <div id='app' class='container mx-auto p-8'>
+        <h1 class='text-4xl font-bold text-indigo-600'>{{ title }}</h1>
+        <p class='mt-4 text-gray-700'>{{ message }}</p>
+        <div class='mt-8 p-4 bg-white rounded shadow' v-if='health'>
+            Status: <span class='font-bold text-green-500'>{{ health.status }}</span>
+        </div>
+    </div>
+    <script>
+        const { createApp, ref, onMounted } = Vue
+        createApp({
+            setup() {
+                const title = ref('Show Tracker')
+                const message = ref('Welcome to your personal media analyzer.')
+                const health = ref(null)
+
+                onMounted(async () => {
+                    try {
+                        const res = await fetch('http://localhost:5000/api/health')
+                        health.value = await res.json()
+                    } catch (e) {
+                        console.error('API not reachable', e)
+                    }
+                })
+
+                return { title, message, health }
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>

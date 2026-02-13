@@ -6,8 +6,8 @@
 Initialize the project scaffold and define the core database schema for movies, people, and user history.
 
 ## Tasks
-- [ ] Initialize Python Flask environment
-- [ ] Setup SQLAlchemy & SQLite database schema
-- [ ] Create initial database models
-- [ ] Setup basic Vue.js frontend scaffold
-- [ ] Connect Flask API with Vue.js frontend
+- [x] Initialize Python Flask environment
+- [x] Setup SQLAlchemy & SQLite database schema
+- [x] Create initial database models
+- [x] Setup basic Vue.js frontend scaffold
+- [x] Connect Flask API with Vue.js frontend (Health Check)

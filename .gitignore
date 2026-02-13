@@ -1,2 +1,18 @@
+# Flask
+instance/
+.webassets-cache
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
 .env
+
+# SQLite
+*.db
+
+# Vue/Frontend
+dist/
+node_modules/
 .gemini/
