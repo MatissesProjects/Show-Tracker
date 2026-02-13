@@ -69,7 +69,7 @@ def create_app():
         
         # Order by unrated first, then by most recently added
         media_list = Media.query.filter(Media.id.in_(subquery)).order_by(
-            Media.user_rating == 0, func.desc(Media.user_rating == 0), 
+            func.abs(Media.user_rating) == 0, 
             Media.id.desc()
         ).limit(100).all()
         
