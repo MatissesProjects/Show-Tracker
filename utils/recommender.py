@@ -9,6 +9,9 @@ def get_user_taste_profile():
     top_people = get_top_people(limit=100)
     genre_stats = get_genre_stats()
     
+    # Get full objects for liked media to understand their DNA
+    liked_media = Media.query.filter(Media.user_rating == 1).all()
+    
     liked_people_ids = [p[0] for p in db.session.query(MediaPerson.person_id).join(Media).filter(Media.user_rating == 1).distinct().all()]
     disliked_people_ids = [p[0] for p in db.session.query(MediaPerson.person_id).join(Media).filter(Media.user_rating == -1).distinct().all()]
 
@@ -24,11 +27,12 @@ def get_user_taste_profile():
         'people': people_weights,
         'genres': genre_weights,
         'liked_people_ids': liked_people_ids,
-        'disliked_people_ids': disliked_people_ids
+        'disliked_people_ids': disliked_people_ids,
+        'liked_media': liked_media
     }
 
 def calculate_match_score(media_data, profile):
-    """Scores a piece of media against the taste profile."""
+    """Enhanced scoring with weighted similarity."""
     score = 0
     details = []
     
@@ -37,6 +41,7 @@ def calculate_match_score(media_data, profile):
     genres_list = media_data.get('genres', []) if isinstance(media_data.get('genres'), list) else (media_data.get('Genre', '').split(', ') if media_data.get('Genre') else [])
     rating = media_data.get('imdbRating') or (media_data.get('rating') or {}).get('average') or 0
 
+    # 1. Talent Match (Heavier weights for liked vs frequent)
     people_in_media = []
     if isinstance(actors, list):
         people_in_media = actors
@@ -50,70 +55,95 @@ def calculate_match_score(media_data, profile):
         person_obj = Person.query.filter_by(name=person_name).first()
         if person_obj:
             if person_obj.id in profile['disliked_people_ids']:
-                score -= 40
-                details.append(f"Disliked Talent: {person_name} (-40)")
+                score -= 50
+                details.append(f"Disliked Talent: {person_name} (-50)")
                 continue
             if person_obj.id in profile['liked_people_ids']:
-                score += 30
-                details.append(f"Liked Talent: {person_name} (+30)")
+                score += 40
+                details.append(f"Starring {person_name} (from your Favorites) (+40)")
             
         if person_name in profile['people']:
             count = profile['people'][person_name]
-            points = 15 if count > 5 else 8
+            points = 20 if count > 5 else 10
             score += points
             details.append(f"Frequent Talent: {person_name} (+{points})")
             
+    # 2. Genre Alignment
+    genre_match_count = 0
     for genre in genres_list:
         if genre in profile['genres']:
             points = round(profile['genres'][genre], 1)
             score += points
+            genre_match_count += 1
             
+    if genre_match_count > 0:
+        details.append(f"Matched {genre_match_count} Preferred Genres")
+        
+    # 3. Quality & Popularity
     try:
         r_val = float(rating)
-        score += r_val
-        details.append(f"Rating (+{r_val})")
+        if r_val > 8.0:
+            score += 15
+            details.append(f"Highly Rated ({r_val}) (+15)")
+        elif r_val > 7.0:
+            score += 10
+            details.append(f"Well Rated ({r_val}) (+10)")
+        else:
+            score += r_val
     except: pass
         
     return {'total_score': round(score, 1), 'breakdown': details}
 
 def get_proactive_suggestions(db_instance, limit=20, target_people=None, target_genres=None):
     """
-    Enhanced engine with multi-filter support.
+    Intelligent engine using Content-Based Similarity Intersections.
     """
     profile = get_user_taste_profile()
     suggestions = []
     seen_titles = set([m.title.lower() for m in db_instance.session.query(Media.title).all()])
     
-    search_people = target_people if target_people else []
-    search_genres = target_genres if target_genres else []
-
-    # Strategy 1: Filtered Search (Explicit selections)
-    if search_people or search_genres:
-        # Search by specific people
-        for person_name in search_people:
-            suggestions.extend(fetch_by_person(person_name, profile, seen_titles, limit))
-        
-        # Search by specific genres
-        for genre_name in search_genres:
-            suggestions.extend(fetch_by_genre(genre_name, profile, seen_titles, limit))
-            
-        # If we have both, only keep those that match BOTH where possible? 
-        # For now, let's just return the combined set, sorted by score.
+    # 1. Targeted Filter Mode
+    if target_people or target_genres:
+        for p in (target_people or []):
+            suggestions.extend(fetch_by_person(p, profile, seen_titles, limit))
+        for g in (target_genres or []):
+            suggestions.extend(fetch_by_genre(g, profile, seen_titles, limit))
+    
+    # 2. High-Intelligence Proactive Mode
     else:
-        # Auto-mode: pick from liked names or top talent
-        liked_people = db_instance.session.query(Person.name).filter(Person.id.in_(profile['liked_people_ids'])).all()
-        liked_names = [p[0] for p in liked_people]
-        auto_search = liked_names if liked_names else sorted(profile['people'].items(), key=lambda x: x[1], reverse=True)[:15]
-        if auto_search and isinstance(auto_search[0], tuple): auto_search = [p[0] for p in auto_search]
-        random.shuffle(auto_search)
-        
-        for person_name in auto_search[:8]:
-            suggestions.extend(fetch_by_person(person_name, profile, seen_titles, limit))
-            if len(suggestions) >= limit: break
+        # Strategy A: Similarity via 'Liked' Media DNA
+        if profile['liked_media']:
+            sample_likes = random.sample(profile['liked_media'], min(len(profile['liked_media']), 5))
+            for media in sample_likes:
+                # Find actors from this specific liked show
+                actors = [mp.person.name for mp in media.person_memberships if mp.role == 'Actor'][:3]
+                genres = (media.genres or "").split(', ')
+                
+                for actor in actors:
+                    # Fetch works by this actor
+                    candidates = fetch_by_person(actor, profile, seen_titles, 5)
+                    for c in candidates:
+                        # CROSS-REFERENCE: Does it match the genre of the show we liked?
+                        c_genres = c['genre'].split(', ')
+                        if any(g in c_genres for g in genres):
+                            c['match']['total_score'] += 20
+                            c['match']['breakdown'].insert(0, f"Similar to {media.title} (+20)")
+                            suggestions.append(c)
 
-    # Remove duplicates and sort by match score
-    unique_suggestions = {s['title']: s for s in suggestions}.values()
-    return sorted(unique_suggestions, key=lambda x: x['match']['total_score'], reverse=True)[:limit]
+        # Strategy B: Top Talent Diversification
+        top_talent = sorted(profile['people'].items(), key=lambda x: x[1], reverse=True)[:10]
+        random.shuffle(top_talent)
+        for person_name, count in top_talent[:5]:
+            suggestions.extend(fetch_by_person(person_name, profile, seen_titles, 5))
+
+    # Final Cleanup: Remove duplicates, filter by quality, and sort
+    unique_suggestions = {s['title']: s for s in suggestions if s['poster']}.values()
+    
+    # Filter: Only show things with a match score > 30 to reduce randomness
+    high_quality = [s for s in unique_suggestions if s['match']['total_score'] > 30]
+    
+    return sorted(high_quality if high_quality else unique_suggestions, 
+                  key=lambda x: x['match']['total_score'], reverse=True)[:limit]
 
 def fetch_by_person(person_name, profile, seen_titles, limit):
     results = []
