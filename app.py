@@ -145,6 +145,40 @@ def create_app():
         db.session.commit()
         return jsonify({'message': 'Rating updated'}), 200
 
+    @app.route('/api/media/<int:media_id>/details', methods=['GET'])
+    def get_media_details(media_id):
+        from models import Media
+        from utils.recommender import get_user_taste_profile, calculate_match_score
+        
+        m = Media.query.get_or_404(media_id)
+        profile = get_user_taste_profile()
+        
+        actors = ", ".join([mp.person.name for mp in m.person_memberships if mp.role == 'Actor'])
+        director = ", ".join([mp.person.name for mp in m.person_memberships if mp.role == 'Director'])
+        writer = ", ".join([mp.person.name for mp in m.person_memberships if mp.role == 'Writer'])
+        
+        media_data = {
+            'Actors': actors,
+            'Director': director,
+            'Writer': writer,
+            'Genre': m.genres,
+            'imdbRating': m.rating
+        }
+        
+        score_data = calculate_match_score(media_data, profile)
+        
+        return jsonify({
+            'id': m.id,
+            'title': m.title,
+            'year': m.release_date[:4] if m.release_date else '????',
+            'genre': m.genres,
+            'poster': m.poster_url,
+            'summary': m.overview or "No description available.",
+            'match': score_data,
+            'youtube_url': f"https://www.youtube.com/results?search_query={m.title.replace(' ', '+')}+funny+moments+clips",
+            'on_netflix': False 
+        })
+
     @app.route('/api/media/<int:media_id>/watchlist', methods=['POST'])
     def toggle_watchlist(media_id):
         from models import Media
