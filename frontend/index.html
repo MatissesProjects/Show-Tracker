@@ -289,8 +289,15 @@
                             <h3 class='text-3xl font-black text-white tracking-tighter uppercase'>Your Library</h3>
                             <div class='flex items-center gap-8'><span class='text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]'>PAGE {{ currentPage }} / {{ totalPages }}</span><button @click='fetchMedia' class='text-indigo-400 font-black text-xs hover:text-indigo-300 uppercase underline underline-offset-8'>Refresh</button></div>
                         </div>
-                        <div class='overflow-x-auto'>
-                            <table class='w-full text-left'>
+                        <div class='overflow-x-auto relative'>
+                            <!-- Library Loading Overlay -->
+                            <div v-if="loadingMedia" class="absolute inset-0 bg-slate-950/20 backdrop-blur-[2px] z-10 flex items-center justify-center">
+                                <div class="bg-indigo-600/20 p-4 rounded-2xl border border-indigo-500/30 animate-pulse">
+                                    <span class="text-indigo-400 font-black text-[10px] uppercase tracking-[0.3em]">Syncing Intelligence...</span>
+                                </div>
+                            </div>
+
+                            <table class='w-full text-left' :class="loadingMedia ? 'opacity-20 blur-[1px]' : 'transition-all duration-300'">
                                 <tbody class='divide-y divide-white/5'>
                                     <tr v-for='item in media' :key='item.id' @click="openWatchlistModal(item)" class='hover:bg-indigo-500/5 transition-colors group cursor-pointer'>
                                         <td class='px-12 py-10'><div class='flex items-center gap-6'><img v-if='item.poster_url && item.poster_url !== "N/A"' :src='item.poster_url' @error="handleImageError(item)" class='w-12 h-16 object-cover rounded-lg shadow-lg border border-white/5' /><div v-else class='w-12 h-16 bg-slate-800 rounded-lg border border-white/5 flex items-center justify-center text-[8px] font-black text-slate-600 text-center uppercase p-1'>{{ item.title }}</div><div><p class='font-black text-white text-xl tracking-tight'>{{ item.title }}</p><p class='text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mt-1'>{{ item.media_type }}</p></div></div></td>
@@ -415,6 +422,8 @@
                 const watchlist = ref([]); const refreshingSuggestions = ref(false);
                 const loadingWatchlist = ref(false); const activeFilters = ref([]);
                 const currentPage = ref(1); const totalPages = ref(1);
+                const loadingMedia = ref(false);
+                const mediaCache = new Map();
                 const selectedFile = ref(null); const uploading = ref(false);
                 const enriching = ref(false); const searching = ref(false);
                 const uploadStatus = ref(''); const searchQuery = ref('');
@@ -554,6 +563,7 @@
                 const toggleWatchlist = async (mediaId) => {
                     try { 
                         await fetch(`http://localhost:5000/api/media/${mediaId}/watchlist`, { method: 'POST' }); 
+                        mediaCache.clear();
                         Promise.all([fetchWatchlist(), fetchMedia()]); 
                     } catch (e) {}
                 };
@@ -628,16 +638,40 @@
 
                 const fetchGenreStats = async () => { try { const res = await fetch('http://localhost:5000/api/stats/genres'); const data = await res.json(); genres.value = Array.isArray(data) ? data : []; } catch (e) { genres.value = []; } };
                 const fetchPeopleStats = async () => { try { const res = await fetch('http://localhost:5000/api/stats/people'); const data = await res.json(); people.value = Array.isArray(data) ? data : []; } catch (e) { people.value = []; } };
-                const fetchMedia = async () => { try { const res = await fetch(`http://localhost:5000/api/media?page=${currentPage.value}&per_page=15`); const data = await res.json(); media.value = data.items; totalPages.value = data.pages; totalMedia.value = data.total; } catch (e) {} };
+                const fetchMedia = async (page = null) => { 
+                    const targetPage = page || currentPage.value;
+                    if (mediaCache.has(targetPage)) {
+                        const data = mediaCache.get(targetPage);
+                        media.value = data.items;
+                        totalPages.value = data.pages;
+                        totalMedia.value = data.total;
+                        return;
+                    }
+
+                    loadingMedia.value = true;
+                    try { 
+                        const res = await fetch(`http://localhost:5000/api/media?page=${targetPage}&per_page=15`); 
+                        const data = await res.json(); 
+                        media.value = data.items; 
+                        totalPages.value = data.pages; 
+                        totalMedia.value = data.total; 
+                        mediaCache.set(targetPage, data);
+
+                        // Prefetch next
+                        if (targetPage < data.pages && !mediaCache.has(targetPage + 1)) {
+                            fetch(`http://localhost:5000/api/media?page=${targetPage + 1}&per_page=15`)
+                                .then(r => r.json())
+                                .then(nextData => mediaCache.set(targetPage + 1, nextData));
+                        }
+                    } catch (e) {} finally { loadingMedia.value = false; }
+                };
+
                 const changePage = async (page) => { 
                     if (page >= 1 && page <= totalPages.value) { 
                         currentPage.value = page; 
                         await fetchMedia(); 
-                        // Scroll to top of the library section
                         const librarySection = document.querySelector('section.glass.rounded-\\[3rem\\].shadow-2xl');
-                        if (librarySection) {
-                            librarySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        }
+                        if (librarySection) librarySection.scrollIntoView({ behavior: 'smooth', block: 'start' });
                     } 
                 };
                 const visiblePages = computed(() => { const pages = []; let start = Math.max(1, currentPage.value - 2); let end = Math.min(totalPages.value, start + 4); if (end - start < 4) start = Math.max(1, end - 4); for (let i = start; i <= end; i++) if (i > 0) pages.push(i); return pages; });
@@ -654,6 +688,7 @@
                             body: JSON.stringify({ rating }) 
                         });
                         
+                        mediaCache.clear();
                         // Fire refreshes in parallel to fill the gap and update stats
                         Promise.all([fetchMedia(), fetchPeopleStats(), fetchWatchlist(), fetchSuggestions()]);
                     } catch (e) { fetchMedia(); }
@@ -672,7 +707,7 @@
                     } catch (e) {}
                 });
 
-                return { health, media, totalMedia, people, genres, suggestions, refreshingSuggestions, loadingWatchlist, activeFilters, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal, fetchSuggestions, toggleFilter, isFilterActive, clearFilters, watchlist, toggleWatchlist, addToWatchlist, rateSearchResult, selectedSuggestion, openModal, closeModal, openWatchlistModal, getTrailerUrl, handleImageError, refreshMedia, rateExternalFromModal, addToWatchlistFromModal, createBackup, deepDiscoveries, discovering, runDeepDiscovery, aiAvailable, checkAiStatus }
+                return { health, media, totalMedia, people, genres, suggestions, refreshingSuggestions, loadingWatchlist, activeFilters, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal, fetchSuggestions, toggleFilter, isFilterActive, clearFilters, watchlist, toggleWatchlist, addToWatchlist, rateSearchResult, selectedSuggestion, openModal, closeModal, openWatchlistModal, getTrailerUrl, handleImageError, refreshMedia, rateExternalFromModal, addToWatchlistFromModal, createBackup, deepDiscoveries, discovering, runDeepDiscovery, aiAvailable, checkAiStatus, loadingMedia }
             }
         }).mount('#app')
     </script>
