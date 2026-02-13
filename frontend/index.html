@@ -1,181 +1,230 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Show Tracker</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Show Tracker | Your Media Intelligence</title>
     <script src='https://unpkg.com/vue@3/dist/vue.global.js'></script>
     <script src='https://cdn.tailwindcss.com'></script>
+    <style>
+        [v-cloak] { display: none; }
+        .gradient-bg { background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%); }
+        .card-hover:hover { transform: translateY(-4px); }
+    </style>
 </head>
-<body class='bg-gray-100'>
-    <div id='app' class='container mx-auto p-8'>
-        <h1 class='text-4xl font-bold text-indigo-600'>{{ title }}</h1>
-        <p class='mt-4 text-gray-700'>{{ message }}</p>
-        
-        <!-- Upload Section -->
-        <div class='mt-8 p-6 bg-white rounded shadow'>
-            <h2 class='text-xl font-semibold mb-4'>Import Netflix History</h2>
-            <div class='flex items-center gap-4'>
-                <input type='file' @change='handleFileUpload' class='block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100' />
-                <button @click='uploadFile' :disabled='!selectedFile || uploading' class='bg-indigo-600 text-white px-4 py-2 rounded disabled:bg-gray-400'>
-                    {{ uploading ? 'Uploading...' : 'Upload' }}
-                </button>
-                <button @click='enrichData' :disabled='enriching' class='bg-green-600 text-white px-4 py-2 rounded disabled:bg-gray-400'>
-                    {{ enriching ? 'Enriching...' : 'Enrich with OMDb' }}
-                </button>
+<body class='bg-slate-50 text-slate-900 font-sans'>
+    <div id='app' v-cloak>
+        <!-- Top Navigation -->
+        <nav class='gradient-bg text-white shadow-lg sticky top-0 z-50'>
+            <div class='container mx-auto px-6 py-4 flex justify-between items-center'>
+                <div class='flex items-center gap-2'>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a2 2 0 002-2V6a2 2 0 00-2-2H4a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <h1 class='text-2xl font-black tracking-tight'>SHOW<span class='text-indigo-200'>TRACKER</span></h1>
+                </div>
+                <div class='flex items-center gap-6'>
+                    <div class='flex items-center gap-2 text-sm bg-white/10 px-3 py-1 rounded-full' v-if='health'>
+                        <span class='h-2 w-2 rounded-full bg-green-400 animate-pulse'></span>
+                        {{ health.status }}
+                    </div>
+                </div>
             </div>
-            <p v-if='uploadStatus' class='mt-4 text-sm' :class='uploadStatus.includes("Error") ? "text-red-500" : "text-green-500"'>
+        </nav>
+
+        <main class='container mx-auto px-6 py-8'>
+            <!-- Header Section -->
+            <div class='flex flex-col md:flex-row justify-between items-start gap-6 mb-12'>
+                <div>
+                    <h2 class='text-3xl font-bold'>Welcome Back</h2>
+                    <p class='text-slate-500 mt-1'>Analyzing your library of {{ media.length }} unique titles.</p>
+                </div>
+                
+                <div class='flex gap-3'>
+                    <label class='bg-white border-2 border-slate-200 hover:border-indigo-500 px-4 py-2 rounded-xl cursor-pointer transition-all flex items-center gap-2 font-semibold text-slate-700'>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                        Import Netflix
+                        <input type='file' @change='handleFileUpload' class='hidden' />
+                    </label>
+                    <button @click='enrichData' :disabled='enriching' class='bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-xl font-bold transition-all disabled:opacity-50 flex items-center gap-2'>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        {{ enriching ? 'Enriching...' : 'Enrich with OMDb' }}
+                    </button>
+                </div>
+            </div>
+
+            <p v-if='uploadStatus' class='mb-8 p-4 rounded-xl border-l-4' :class='uploadStatus.includes("Error") ? "bg-red-50 border-red-500 text-red-700" : "bg-green-50 border-green-500 text-green-700"'>
                 {{ uploadStatus }}
             </p>
-        </div>
 
-        <div class='mt-8 p-4 bg-white rounded shadow border-l-4 border-green-500' v-if='health'>
-            System Status: <span class='font-bold text-green-500'>{{ health.status }}</span>
-        </div>
-
-        <!-- Recommendations -->
-        <div class='mt-8 p-6 bg-white rounded shadow border-t-4 border-green-500' v-if='suggestions && suggestions.length > 0'>
-            <h2 class='text-xl font-semibold mb-6'>Recommended for You</h2>
-            <div class='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6'>
-                <div v-for='s in suggestions' :key='s.title' class='flex flex-col bg-gray-50 rounded border overflow-hidden hover:shadow-md transition-shadow'>
-                    <img v-if='s.poster !== "N/A"' :src='s.poster' class='w-full h-48 object-cover' />
-                    <div class='p-4 flex-1 flex flex-col'>
-                        <div class='flex justify-between items-start'>
-                            <h3 class='font-bold text-sm'>{{ s.title }}</h3>
-                            <span class='bg-indigo-600 text-white text-[10px] px-2 py-1 rounded font-black'>{{ s.match.total_score }}</span>
+            <div class='grid grid-cols-1 lg:grid-cols-3 gap-8'>
+                <!-- Left Column: Discovery & Suggestions -->
+                <div class='lg:col-span-2 space-y-8'>
+                    
+                    <!-- Discovery Search -->
+                    <section class='bg-white rounded-3xl p-8 shadow-sm border border-slate-100'>
+                        <h3 class='text-xl font-bold mb-6 flex items-center gap-2'>
+                            <span class='text-indigo-600'>●</span> Discover New Media
+                        </h3>
+                        <div class='flex gap-3 p-1.5 bg-slate-50 rounded-2xl border border-slate-100 focus-within:ring-2 ring-indigo-500/20 transition-all'>
+                            <input type='text' v-model='searchQuery' @keyup.enter='searchNewMedia' placeholder='Search for a movie or show...' class='flex-1 bg-transparent px-4 py-2 outline-none' />
+                            <button @click='searchNewMedia' :disabled='searching' class='bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-indigo-700 transition-colors'>
+                                {{ searching ? '...' : 'Check Compatibility' }}
+                            </button>
                         </div>
-                        <p class='text-[10px] text-gray-500 mt-1'>{{ s.year }} • {{ s.genre }}</p>
-                        <div class='mt-auto pt-4'>
-                            <div class='flex flex-wrap gap-1'>
-                                <span v-for='reason in s.match.breakdown.slice(0, 2)' :key='reason' class='text-[9px] bg-white border px-1.5 py-0.5 rounded text-gray-600'>
-                                    {{ reason }}
-                                </span>
+
+                        <!-- Search Result Card -->
+                        <div v-if='searchResult' class='mt-8 flex flex-col md:flex-row gap-8 p-6 bg-slate-50 rounded-2xl border border-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-300'>
+                            <div class='relative'>
+                                <img v-if='searchResult.poster !== "N/A"' :src='searchResult.poster' class='w-40 h-auto rounded-xl shadow-xl' />
+                                <div class='absolute -top-3 -right-3 bg-indigo-600 text-white w-12 h-12 rounded-full flex items-center justify-center font-black shadow-lg border-4 border-white'>
+                                    {{ Math.round(searchResult.match.total_score) }}
+                                </div>
+                            </div>
+                            <div class='flex-1'>
+                                <h4 class='text-2xl font-black'>{{ searchResult.title }} <span class='text-slate-400 font-normal'>({{ searchResult.year }})</span></h4>
+                                <p class='text-indigo-600 font-bold text-sm tracking-wide uppercase mt-1'>{{ searchResult.genre }}</p>
+                                <p class='mt-4 text-slate-600 leading-relaxed'>{{ searchResult.plot }}</p>
+                                <div class='mt-6 flex flex-wrap gap-2'>
+                                    <span v-for='reason in searchResult.match.breakdown' :key='reason' class='text-xs bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg shadow-sm'>
+                                        {{ reason }}
+                                    </span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+                        <p v-if='searchError' class='mt-4 text-red-500 text-sm'>{{ searchError }}</p>
+                    </section>
 
-        <!-- Discovery Search -->
-        <div class='mt-8 p-6 bg-white rounded shadow border-t-4 border-indigo-500'>
-            <h2 class='text-xl font-semibold mb-4'>Discover New Media</h2>
-            <div class='flex gap-4'>
-                <input type='text' v-model='searchQuery' @keyup.enter='searchNewMedia' placeholder='Search for a movie or show...' class='flex-1 p-2 border rounded' />
-                <button @click='searchNewMedia' :disabled='searching' class='bg-indigo-600 text-white px-6 py-2 rounded'>
-                    {{ searching ? 'Searching...' : 'Check Compatibility' }}
-                </button>
-            </div>
-
-            <!-- Search Result -->
-            <div v-if='searchResult' class='mt-8 flex flex-col md:flex-row gap-6 p-4 bg-gray-50 rounded border'>
-                <img v-if='searchResult.poster !== "N/A"' :src='searchResult.poster' class='w-32 h-auto rounded shadow' />
-                <div class='flex-1'>
-                    <div class='flex justify-between items-start'>
-                        <div>
-                            <h3 class='text-2xl font-bold'>{{ searchResult.title }} <span class='text-gray-400 font-normal'>({{ searchResult.year }})</span></h3>
-                            <p class='text-sm text-indigo-600 font-medium'>{{ searchResult.genre }}</p>
-                        </div>
-                        <div class='text-center bg-white p-3 rounded shadow border'>
-                            <p class='text-xs text-gray-500 uppercase font-bold'>Match Score</p>
-                            <p class='text-3xl font-black text-indigo-600'>{{ searchResult.match.total_score }}</p>
-                        </div>
-                    </div>
-                    <p class='mt-4 text-gray-700'>{{ searchResult.plot }}</p>
-                    <div class='mt-4 flex flex-wrap gap-2'>
-                        <span v-for='reason in searchResult.match.breakdown' :key='reason' class='text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded'>
-                            {{ reason }}
-                        </span>
-                    </div>
-                </div>
-            </div>
-            <p v-if='searchError' class='mt-4 text-red-500 text-sm'>{{ searchError }}</p>
-        </div>
-
-        <!-- Top Talent & Genres -->
-        <div class='mt-8 grid grid-cols-1 md:grid-cols-2 gap-8' v-if='(people && people.length > 0) || (genres && genres.length > 0)'>
-            <div class='p-6 bg-white rounded shadow'>
-                <h2 class='text-xl font-semibold mb-4'>Top People (By Show Count)</h2>
-                <ul class='divide-y'>
-                    <li v-for='p in people' :key='p.name + p.role' class='py-2 flex justify-between'>
-                        <div>
-                            <span class='font-medium'>{{ p.name }}</span>
-                            <span class='ml-2 text-xs text-gray-500 uppercase'>{{ p.role }}</span>
-                        </div>
-                        <span class='bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full text-xs font-bold'>
-                            {{ p.count }} shows
-                        </span>
-                    </li>
-                </ul>
-            </div>
-            
-            <div class='p-6 bg-white rounded shadow'>
-                <h2 class='text-xl font-semibold mb-4'>Top Genres</h2>
-                <div class='flex flex-wrap gap-2'>
-                    <div v-for='g in genres' :key='g.name' class='flex items-center bg-green-50 border border-green-200 rounded-full px-4 py-2'>
-                        <span class='text-green-700 font-medium'>{{ g.name }}</span>
-                        <span class='ml-2 bg-green-200 text-green-800 text-xs px-2 py-0.5 rounded-full'>{{ g.count }}</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Media List -->
-        <div class='mt-8 p-6 bg-white rounded shadow' v-if="media && media.length > 0">
-            <div class='flex justify-between items-center mb-4'>
-                <h2 class='text-xl font-semibold'>Recently Added Media</h2>
-                <button @click='fetchMedia' class='text-indigo-600 hover:underline text-sm'>Refresh List</button>
-            </div>
-            <div class='overflow-x-auto'>
-                <table class='min-w-full text-left text-sm'>
-                    <thead class='bg-gray-50'>
-                        <tr>
-                            <th class='p-3'>Title</th>
-                            <th class='p-3'>Type</th>
-                            <th class='p-3'>Genre</th>
-                            <th class='p-3'>Rating</th>
-                            <th class='p-3'>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for='item in media' :key='item.id' class='border-b'>
-                            <td class='p-3 font-medium'>{{ item.title }}</td>
-                            <td class='p-3 capitalize'>{{ item.media_type }}</td>
-                            <td class='p-3 text-xs text-gray-600'>{{ item.genres || 'N/A' }}</td>
-                            <td class='p-3'>
-                                <span v-if='item.rating && item.rating !== "N/A"' class='bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded text-xs font-bold'>
-                                    {{ item.rating }}
-                                </span>
-                                <span v-else class='text-gray-400'>-</span>
-                            </td>
-                            <td class='p-3'>
-                                <div class='flex gap-2'>
-                                    <button @click='rateMedia(item.id, 1)' :class='item.user_rating === 1 ? "text-green-600" : "text-gray-400 hover:text-green-500"'>
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                            <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
-                                        </svg>
-                                    </button>
-                                    <button @click='rateMedia(item.id, -1)' :class='item.user_rating === -1 ? "text-red-600" : "text-gray-400 hover:text-red-500"'>
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                            <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.057 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
-                                        </svg>
-                                    </button>
+                    <!-- Recommendations Grid -->
+                    <section class='space-y-6' v-if='suggestions && suggestions.length > 0'>
+                        <h3 class='text-xl font-bold flex items-center gap-2'>
+                            <span class='text-green-500'>●</span> Recommended For You
+                        </h3>
+                        <div class='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6'>
+                            <div v-for='s in suggestions' :key='s.title' class='bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100 flex flex-col transition-all hover:shadow-xl hover:-translate-y-1 group'>
+                                <div class='relative h-56 overflow-hidden'>
+                                    <img v-if='s.poster !== "N/A"' :src='s.poster' class='w-full h-full object-cover transition-transform duration-500 group-hover:scale-110' />
+                                    <div class='absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent'></div>
+                                    <div class='absolute bottom-4 left-4 right-4 flex justify-between items-end'>
+                                        <div>
+                                            <p class='text-[10px] font-bold text-indigo-300 uppercase tracking-widest'>{{ s.genre.split(',')[0] }}</p>
+                                            <h4 class='text-white font-black leading-tight'>{{ s.title }}</h4>
+                                        </div>
+                                        <div class='bg-indigo-600 text-white text-xs font-black px-2 py-1 rounded-lg'>
+                                            {{ Math.round(s.match.total_score) }}
+                                        </div>
+                                    </div>
                                 </div>
-                            </td>
-                            <td class='p-3'>
-                                <span v-if='item.media_type !== "unknown"' class='text-green-600 font-medium'>Enriched</span>
-                                <span v-else class='text-gray-400 italic'>Pending</span>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                                <div class='p-4 flex-1 flex flex-col justify-between'>
+                                    <p class='text-xs text-slate-500'>{{ s.year }} • {{ s.genre }}</p>
+                                    <div class='mt-4 flex flex-wrap gap-1'>
+                                        <span v-for='reason in s.match.breakdown.slice(0, 2)' :key='reason' class='text-[9px] bg-slate-50 border border-slate-100 px-2 py-1 rounded-md text-slate-500 truncate max-w-full'>
+                                            {{ reason }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Right Column: Stats & Analytics -->
+                <div class='space-y-8'>
+                    <!-- Top People -->
+                    <section class='bg-white rounded-3xl p-8 shadow-sm border border-slate-100'>
+                        <h3 class='text-xl font-bold mb-6'>Top Talent</h3>
+                        <div class='space-y-4'>
+                            <div v-for='p in people.slice(0, 8)' :key='p.name + p.role' class='flex justify-between items-center group'>
+                                <div>
+                                    <p class='font-bold group-hover:text-indigo-600 transition-colors'>{{ p.name }}</p>
+                                    <p class='text-[10px] uppercase tracking-widest text-slate-400 font-bold'>{{ p.role }}</p>
+                                </div>
+                                <div class='bg-slate-50 px-3 py-1 rounded-full text-xs font-black text-slate-500'>
+                                    {{ p.count }}
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Top Genres -->
+                    <section class='bg-white rounded-3xl p-8 shadow-sm border border-slate-100'>
+                        <h3 class='text-xl font-bold mb-6'>Genres</h3>
+                        <div class='flex flex-wrap gap-2'>
+                            <div v-for='g in genres.slice(0, 12)' :key='g.name' class='bg-slate-50 hover:bg-indigo-50 border border-slate-100 px-4 py-2 rounded-xl transition-colors cursor-default'>
+                                <span class='text-sm font-bold text-slate-700'>{{ g.name }}</span>
+                                <span class='ml-2 text-[10px] text-slate-400'>{{ g.count }}</span>
+                            </div>
+                        </div>
+                    </section>
+                </div>
             </div>
-        </div>
+
+            <!-- Bottom Section: Full Media List -->
+            <section class='mt-12 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden'>
+                <div class='p-8 flex justify-between items-center border-b border-slate-50'>
+                    <h3 class='text-xl font-bold'>Your Library</h3>
+                    <button @click='fetchMedia' class='text-indigo-600 font-bold text-sm hover:underline'>Refresh Activity</button>
+                </div>
+                <div class='overflow-x-auto'>
+                    <table class='w-full text-left'>
+                        <thead>
+                            <tr class='bg-slate-50/50 text-slate-400 text-[10px] uppercase tracking-widest font-black'>
+                                <th class='px-8 py-4'>Media Info</th>
+                                <th class='px-8 py-4'>Metadata</th>
+                                <th class='px-8 py-4 text-center'>Rating</th>
+                                <th class='px-8 py-4 text-right'>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class='divide-y divide-slate-50'>
+                            <tr v-for='item in media' :key='item.id' class='hover:bg-slate-50/50 transition-colors'>
+                                <td class='px-8 py-5'>
+                                    <p class='font-bold text-slate-800'>{{ item.title }}</p>
+                                    <p class='text-xs text-slate-400 capitalize'>{{ item.media_type }}</p>
+                                </td>
+                                <td class='px-8 py-5'>
+                                    <p class='text-xs font-semibold text-slate-600'>{{ item.genres || '...' }}</p>
+                                    <p class='text-[10px] text-slate-400 mt-1'>{{ item.release_date || 'Unknown Date' }}</p>
+                                </td>
+                                <td class='px-8 py-5 text-center'>
+                                    <span v-if='item.rating && item.rating !== "N/A"' class='bg-amber-100 text-amber-700 px-2 py-1 rounded text-[10px] font-black'>
+                                        {{ item.rating }}
+                                    </span>
+                                    <span v-else class='text-slate-300'>--</span>
+                                </td>
+                                <td class='px-8 py-5 text-right'>
+                                    <div class='flex justify-end items-center gap-4'>
+                                        <div class='flex gap-1'>
+                                            <button @click='rateMedia(item.id, 1)' :class='item.user_rating === 1 ? "text-green-500 scale-125" : "text-slate-300 hover:text-green-400"' class='transition-all duration-300'>
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
+                                                </svg>
+                                            </button>
+                                            <button @click='rateMedia(item.id, -1)' :class='item.user_rating === -1 ? "text-red-500 scale-125" : "text-slate-300 hover:text-red-400"' class='transition-all duration-300'>
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.057 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                        <div class='w-2 h-2 rounded-full' :class='item.media_type !== "unknown" ? "bg-green-500" : "bg-slate-200"'></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
     </div>
+
     <script>
         const { createApp, ref, onMounted } = Vue
         createApp({
             setup() {
                 const title = ref('Show Tracker')
-                const message = ref('Welcome to your personal media analyzer.')
                 const health = ref(null)
                 const media = ref([])
                 const people = ref([])
@@ -227,7 +276,6 @@
                         genres.value = Array.isArray(data) ? data : []
                     } catch (e) {
                         console.error('Failed to fetch genre stats', e)
-                        genres.value = []
                     }
                 }
 
@@ -238,7 +286,6 @@
                         people.value = Array.isArray(data) ? data : []
                     } catch (e) {
                         console.error('Failed to fetch people stats', e)
-                        people.value = []
                     }
                 }
 
@@ -249,7 +296,6 @@
                         media.value = Array.isArray(data) ? data : []
                     } catch (e) {
                         console.error('Failed to fetch media', e)
-                        media.value = []
                     }
                 }
 
@@ -263,39 +309,35 @@
                         if (res.ok) {
                             await fetchMedia()
                             await fetchPeopleStats()
-                            await fetchSuggestions() // Refresh suggestions based on new rating
+                            await fetchSuggestions()
                         }
                     } catch (e) {
                         console.error('Failed to update rating', e)
                     }
                 }
 
-                const handleFileUpload = (event) => {
+                const handleFileUpload = async (event) => {
                     selectedFile.value = event.target.files[0]
+                    if (selectedFile.value) {
+                        await uploadFile()
+                    }
                 }
 
                 const uploadFile = async () => {
-                    if (!selectedFile.value) return
                     uploading.value = true
-                    uploadStatus.value = 'Uploading and parsing... please wait.'
-                    
+                    uploadStatus.value = 'Analyzing history...'
                     const formData = new FormData()
                     formData.append('file', selectedFile.value)
-
                     try {
                         const res = await fetch('http://localhost:5000/api/upload-netflix', {
                             method: 'POST',
                             body: formData
                         })
                         const result = await res.json()
-                        if (res.ok) {
-                            uploadStatus.value = result.message
-                            await fetchMedia()
-                        } else {
-                            uploadStatus.value = `Error: ${result.error}`
-                        }
+                        uploadStatus.value = result.message
+                        await fetchMedia()
                     } catch (e) {
-                        uploadStatus.value = 'Error: Could not reach the server'
+                        uploadStatus.value = 'Error uploading file'
                     } finally {
                         uploading.value = false
                     }
@@ -303,7 +345,7 @@
 
                 const enrichData = async () => {
                     enriching.value = true
-                    uploadStatus.value = 'Enriching data... This processes all unknown titles and can take a minute.'
+                    uploadStatus.value = 'Pulling rich metadata from OMDb...'
                     try {
                         const res = await fetch('http://localhost:5000/api/enrich', { method: 'POST' })
                         const result = await res.json()
@@ -313,7 +355,7 @@
                         await fetchGenreStats()
                         await fetchSuggestions()
                     } catch (e) {
-                        uploadStatus.value = 'Error: Could not reach the server'
+                        uploadStatus.value = 'Error reaching the server'
                     } finally {
                         enriching.value = false
                     }
@@ -332,7 +374,7 @@
                     }
                 })
 
-                return { title, message, health, media, people, genres, suggestions, selectedFile, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia }
+                return { health, media, people, genres, suggestions, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia }
             }
         }).mount('#app')
     </script>
