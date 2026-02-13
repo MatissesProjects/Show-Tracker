@@ -15,6 +15,7 @@ def create_app():
     db.init_app(app)
     
     with app.app_context():
+        # Import models here to ensure they are registered before create_all
         import models
         db.create_all()
     
@@ -37,6 +38,15 @@ def create_app():
         try:
             count = parse_netflix_history(file.read(), db)
             return jsonify({'message': f'Successfully imported {count} new entries'}), 200
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/enrich', methods=['POST'])
+    def enrich_data():
+        from utils.enricher import enrich_media_data
+        try:
+            count = enrich_media_data(db)
+            return jsonify({'message': f'Successfully enriched {count} unique titles'}), 200
         except Exception as e:
             return jsonify({'error': str(e)}), 500
         

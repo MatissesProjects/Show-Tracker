@@ -18,6 +18,9 @@
                 <button @click='uploadFile' :disabled='!selectedFile || uploading' class='bg-indigo-600 text-white px-4 py-2 rounded disabled:bg-gray-400'>
                     {{ uploading ? 'Uploading...' : 'Upload' }}
                 </button>
+                <button @click='enrichData' :disabled='enriching' class='bg-green-600 text-white px-4 py-2 rounded disabled:bg-gray-400'>
+                    {{ enriching ? 'Enriching...' : 'Enrich with OMDb' }}
+                </button>
             </div>
             <p v-if='uploadStatus' class='mt-4 text-sm' :class='uploadStatus.includes("error") ? "text-red-500" : "text-green-500"'>
                 {{ uploadStatus }}
@@ -37,10 +40,25 @@
                 const health = ref(null)
                 const selectedFile = ref(null)
                 const uploading = ref(false)
+                const enriching = ref(false)
                 const uploadStatus = ref('')
 
                 const handleFileUpload = (event) => {
                     selectedFile.value = event.target.files[0]
+                }
+
+                const enrichData = async () => {
+                    enriching.value = true
+                    uploadStatus.value = 'Enriching data... this may take a moment.'
+                    try {
+                        const res = await fetch('http://localhost:5000/api/enrich', { method: 'POST' })
+                        const result = await res.json()
+                        uploadStatus.value = result.message
+                    } catch (e) {
+                        uploadStatus.value = 'Error: Could not reach the server'
+                    } finally {
+                        enriching.value = false
+                    }
                 }
 
                 const uploadFile = async () => {
