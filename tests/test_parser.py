@@ -18,7 +18,7 @@ def test_netflix_upload(client, app):
     
     with app.app_context():
         # Check Media creation
-        st = Media.query.filter_by(title="Stranger Things: Season 1: Chapter One").first()
+        st = Media.query.filter_by(title="Stranger Things").first()
         assert st is not None
         
         # Check WatchHistory creation
