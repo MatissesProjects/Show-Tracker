@@ -190,10 +190,15 @@ def create_app():
 
     @app.route('/api/suggestions', methods=['GET'])
     def get_suggestions():
+        from flask import request
         from utils.recommender import get_proactive_suggestions
+        
+        person = request.args.get('person')
+        genre = request.args.get('genre')
+        
         try:
-            # Increased limit for a better carousel experience
-            suggestions = get_proactive_suggestions(db, limit=20)
+            # Pass filters to the engine
+            suggestions = get_proactive_suggestions(db, limit=20, target_person=person, target_genre=genre)
             return jsonify(suggestions), 200
         except Exception as e:
             return jsonify({'error': str(e)}), 500

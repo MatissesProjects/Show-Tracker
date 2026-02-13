@@ -76,22 +76,40 @@ def calculate_match_score(media_data, profile):
         
     return {'total_score': round(score, 1), 'breakdown': details}
 
-def get_proactive_suggestions(db_instance, limit=20):
+def get_proactive_suggestions(db_instance, limit=20, target_person=None, target_genre=None):
     """
-    Enhanced engine with Netflix availability check and randomization for 'Refresh'.
+    Enhanced engine with filtering for specific talent or genres.
     """
     profile = get_user_taste_profile()
     suggestions = []
     seen_titles = set([m.title.lower() for m in db_instance.session.query(Media.title).all()])
     
-    # Strategy 1: Find more from Liked Talent (Pick a random subset for refresh variety)
-    liked_people = db_instance.session.query(Person.name).filter(Person.id.in_(profile['liked_people_ids'])).all()
-    liked_names = [p[0] for p in liked_people]
-    
-    search_terms = liked_names if liked_names else sorted(profile['people'].items(), key=lambda x: x[1], reverse=True)[:15]
-    if isinstance(search_terms[0], tuple): search_terms = [p[0] for p in search_terms]
-    
-    random.shuffle(search_terms)
+    search_terms = []
+    if target_person:
+        search_terms = [target_person]
+    elif target_genre:
+        # TVmaze doesn't have a direct genre endpoint, we search for shows with that keyword
+        try:
+            genre_res = requests.get(f"https://api.tvmaze.com/search/shows?q={target_genre}", timeout=5)
+            if genre_res.ok:
+                for item in genre_res.json():
+                    show = item['show']
+                    title = show['name']
+                    if title.lower() not in seen_titles:
+                        score_data = calculate_match_score(show, profile)
+                        suggestions.append(format_suggestion(show, score_data))
+                        seen_titles.add(title.lower())
+                    if len(suggestions) >= limit: return suggestions
+        except: pass
+        return suggestions
+
+    else:
+        # Auto-mode: pick from liked names or top talent
+        liked_people = db_instance.session.query(Person.name).filter(Person.id.in_(profile['liked_people_ids'])).all()
+        liked_names = [p[0] for p in liked_people]
+        search_terms = liked_names if liked_names else sorted(profile['people'].items(), key=lambda x: x[1], reverse=True)[:15]
+        if search_terms and isinstance(search_terms[0], tuple): search_terms = [p[0] for p in search_terms]
+        random.shuffle(search_terms)
 
     for person_name in search_terms[:8]:
         try:
@@ -103,7 +121,7 @@ def get_proactive_suggestions(db_instance, limit=20):
             if not credits_res.ok: continue
             
             credits = credits_res.json()
-            random.shuffle(credits) # Randomize show order for this person
+            random.shuffle(credits)
 
             for credit in credits:
                 show = credit['_embedded']['show']
@@ -111,24 +129,23 @@ def get_proactive_suggestions(db_instance, limit=20):
                 if title.lower() not in seen_titles:
                     show['cast'] = [person_name]
                     score_data = calculate_match_score(show, profile)
-                    
-                    # Check for Netflix
-                    network = (show.get('network') or {}).get('name', '')
-                    web_channel = (show.get('webChannel') or {}).get('name', '')
-                    on_netflix = 'Netflix' in [network, web_channel]
-
-                    suggestions.append({
-                        'title': title,
-                        'year': show.get('premiered', '')[:4],
-                        'genre': ', '.join(show.get('genres', [])),
-                        'poster': (show.get('image') or {}).get('medium'),
-                        'match': score_data,
-                        'on_netflix': on_netflix,
-                        'summary': (show.get('summary') or '').replace('<p>', '').replace('</p>', '').strip()
-                    })
+                    suggestions.append(format_suggestion(show, score_data))
                     seen_titles.add(title.lower())
                 if len(suggestions) >= limit: break
         except: continue
         if len(suggestions) >= limit: break
 
     return sorted(suggestions, key=lambda x: x['match']['total_score'], reverse=True)
+
+def format_suggestion(show, score_data):
+    network = (show.get('network') or {}).get('name', '')
+    web_channel = (show.get('webChannel') or {}).get('name', '')
+    return {
+        'title': show['name'],
+        'year': show.get('premiered', '')[:4],
+        'genre': ', '.join(show.get('genres', [])),
+        'poster': (show.get('image') or {}).get('medium'),
+        'match': score_data,
+        'on_netflix': 'Netflix' in [network, web_channel],
+        'summary': (show.get('summary') or '').replace('<p>', '').replace('</p>', '').strip()
+    }

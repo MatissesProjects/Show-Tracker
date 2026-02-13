@@ -68,11 +68,17 @@
                     <h3 class='text-2xl font-black flex items-center gap-3'>
                         <span class='w-2 h-8 bg-indigo-600 rounded-full'></span>
                         Suggested For You
+                        <span v-if="suggestionFilter" class="text-sm font-bold bg-indigo-600 text-white px-3 py-1 rounded-full uppercase tracking-widest">
+                            {{ suggestionFilter.type }}: {{ suggestionFilter.value }}
+                        </span>
                     </h3>
-                    <div class='flex gap-2'>
+                    <div class='flex gap-2 items-center'>
+                        <button v-if="suggestionFilter" @click='clearSuggestionFilter' class='mr-2 text-xs font-black text-slate-400 hover:text-indigo-600 uppercase tracking-widest'>
+                            Clear Filter
+                        </button>
                         <button @click='fetchSuggestions' :disabled='refreshingSuggestions' class='mr-4 p-2 px-4 rounded-xl bg-indigo-50 text-indigo-600 font-bold text-sm hover:bg-indigo-100 transition-colors flex items-center gap-2'>
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" :class="refreshingSuggestions ? 'animate-spin' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                            Refresh
+                            {{ suggestionFilter ? 'Refresh Filter' : 'Refresh' }}
                         </button>
                         <button @click="scrollSuggestions(-1)" class="p-2 rounded-full bg-white shadow-sm border hover:bg-slate-50 transition-colors">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
@@ -240,7 +246,7 @@
                     <section class='bg-white rounded-[2rem] p-10 shadow-xl shadow-slate-200/50 border border-slate-100'>
                         <h3 class='text-2xl font-black mb-8 flex items-center gap-3'>Top Talent</h3>
                         <div class='space-y-6'>
-                            <div v-for='p in people.slice(0, 10)' :key='p.name + p.role' class='flex justify-between items-center group cursor-default'>
+                            <div v-for='p in people.slice(0, 10)' :key='p.name + p.role' @click="filterSuggestionsByPerson(p.name)" class='flex justify-between items-center group cursor-pointer hover:bg-slate-50 p-2 -m-2 rounded-xl transition-colors'>
                                 <div>
                                     <p class='font-black text-slate-800 group-hover:text-indigo-600 transition-colors'>{{ p.name }}</p>
                                     <p class='text-[10px] uppercase tracking-[0.2em] text-slate-400 font-black'>{{ p.role }}</p>
@@ -256,7 +262,7 @@
                     <section class='bg-white rounded-[2rem] p-10 shadow-xl shadow-slate-200/50 border border-slate-100'>
                         <h3 class='text-2xl font-black mb-8'>Genres</h3>
                         <div class='flex flex-wrap gap-3'>
-                            <div v-for='g in genres.slice(0, 15)' :key='g.name' class='bg-slate-50 hover:bg-indigo-600 hover:text-white border border-slate-100 px-5 py-2.5 rounded-2xl transition-all cursor-default group transform hover:-rotate-2'>
+                            <div v-for='g in genres.slice(0, 15)' :key='g.name' @click="filterSuggestionsByGenre(g.name)" class='bg-slate-50 hover:bg-indigo-600 hover:text-white border border-slate-100 px-5 py-2.5 rounded-2xl transition-all cursor-pointer group transform hover:-rotate-2'>
                                 <span class='text-sm font-black'>{{ g.name }}</span>
                                 <span class='ml-2 text-[10px] text-slate-400 group-hover:text-indigo-200'>{{ g.count }}</span>
                             </div>
@@ -278,6 +284,7 @@
                 const genres = ref([])
                 const suggestions = ref([])
                 const refreshingSuggestions = ref(false)
+                const suggestionFilter = ref(null)
                 const currentPage = ref(1)
                 const totalPages = ref(1)
                 
@@ -294,11 +301,33 @@
                 const fetchSuggestions = async () => {
                     refreshingSuggestions.value = true
                     try {
-                        const res = await fetch('http://localhost:5000/api/suggestions')
+                        let url = 'http://localhost:5000/api/suggestions'
+                        if (suggestionFilter.value) {
+                            const param = suggestionFilter.value.type === 'Person' ? 'person' : 'genre'
+                            url += `?${param}=${encodeURIComponent(suggestionFilter.value.value)}`
+                        }
+                        const res = await fetch(url)
                         const data = await res.json()
                         suggestions.value = Array.isArray(data) ? data : []
                     } catch (e) { console.error('Failed suggestions', e) }
                     finally { refreshingSuggestions.value = false }
+                }
+
+                const filterSuggestionsByPerson = async (name) => {
+                    suggestionFilter.value = { type: 'Person', value: name }
+                    await fetchSuggestions()
+                    if (suggestionScroll.value) suggestionScroll.value.scrollLeft = 0
+                }
+
+                const filterSuggestionsByGenre = async (genre) => {
+                    suggestionFilter.value = { type: 'Genre', value: genre }
+                    await fetchSuggestions()
+                    if (suggestionScroll.value) suggestionScroll.value.scrollLeft = 0
+                }
+
+                const clearSuggestionFilter = async () => {
+                    suggestionFilter.value = null
+                    await fetchSuggestions()
                 }
 
                 const scrollSuggestions = (direction) => {
@@ -318,7 +347,6 @@
                             suggestions.value = suggestions.value.filter(s => s.title !== title)
                             await fetchMedia()
                             await fetchPeopleStats()
-                            // If we run low on suggestions, fetch more
                             if (suggestions.value.length < 3) {
                                 await fetchSuggestions()
                             }
@@ -445,7 +473,7 @@
                     } catch (e) { console.error('API Error', e) }
                 })
 
-                return { health, media, totalMedia, people, genres, suggestions, refreshingSuggestions, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal, fetchSuggestions }
+                return { health, media, totalMedia, people, genres, suggestions, refreshingSuggestions, suggestionFilter, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal, fetchSuggestions, filterSuggestionsByPerson, filterSuggestionsByGenre, clearSuggestionFilter }
             }
         }).mount('#app')
     </script>
