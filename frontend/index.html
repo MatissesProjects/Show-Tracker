@@ -32,7 +32,7 @@
         </div>
 
         <!-- Top Talent -->
-        <div class='mt-8 grid grid-cols-1 md:grid-cols-2 gap-8' v-if='people.length > 0'>
+        <div class='mt-8 grid grid-cols-1 md:grid-cols-2 gap-8' v-if='people && people.length > 0'>
             <div class='p-6 bg-white rounded shadow'>
                 <h2 class='text-xl font-semibold mb-4'>Top People in Your History</h2>
                 <ul class='divide-y'>
@@ -102,18 +102,22 @@
                 const fetchPeopleStats = async () => {
                     try {
                         const res = await fetch('http://localhost:5000/api/stats/people')
-                        people.value = await res.json()
+                        const data = await res.json()
+                        people.value = Array.isArray(data) ? data : []
                     } catch (e) {
                         console.error('Failed to fetch people stats', e)
+                        people.value = []
                     }
                 }
 
                 const fetchMedia = async () => {
                     try {
                         const res = await fetch('http://localhost:5000/api/media')
-                        media.value = await res.json()
+                        const data = await res.json()
+                        media.value = Array.isArray(data) ? data : []
                     } catch (e) {
                         console.error('Failed to fetch media', e)
+                        media.value = []
                     }
                 }
 
@@ -156,6 +160,7 @@
                         const result = await res.json()
                         uploadStatus.value = result.message
                         await fetchMedia()
+                        await fetchPeopleStats()
                     } catch (e) {
                         uploadStatus.value = 'Error: Could not reach the server'
                     } finally {
@@ -174,7 +179,7 @@
                     }
                 })
 
-                return { title, message, health, media, selectedFile, uploading, enriching, uploadStatus, handleFileUpload, uploadFile, enrichData, fetchMedia }
+                return { title, message, health, media, people, selectedFile, uploading, enriching, uploadStatus, handleFileUpload, uploadFile, enrichData, fetchMedia }
             }
         }).mount('#app')
     </script>
