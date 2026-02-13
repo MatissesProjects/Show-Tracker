@@ -67,9 +67,9 @@ def create_app():
             func.max(Media.id).label('max_id')
         ).group_by(Media.title).subquery()
         
-        # Order by unrated first, then by most recently added
+        # Order by unrated first (descending so True comes before False), then by most recently added
         media_list = Media.query.filter(Media.id.in_(subquery)).order_by(
-            func.abs(Media.user_rating) == 0, 
+            (Media.user_rating == 0).desc(), 
             Media.id.desc()
         ).limit(100).all()
         
