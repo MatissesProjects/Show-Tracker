@@ -31,6 +31,41 @@
             System Status: <span class='font-bold text-green-500'>{{ health.status }}</span>
         </div>
 
+        <!-- Discovery Search -->
+        <div class='mt-8 p-6 bg-white rounded shadow border-t-4 border-indigo-500'>
+            <h2 class='text-xl font-semibold mb-4'>Discover New Media</h2>
+            <div class='flex gap-4'>
+                <input type='text' v-model='searchQuery' @keyup.enter='searchNewMedia' placeholder='Search for a movie or show...' class='flex-1 p-2 border rounded' />
+                <button @click='searchNewMedia' :disabled='searching' class='bg-indigo-600 text-white px-6 py-2 rounded'>
+                    {{ searching ? 'Searching...' : 'Check Compatibility' }}
+                </button>
+            </div>
+
+            <!-- Search Result -->
+            <div v-if='searchResult' class='mt-8 flex flex-col md:flex-row gap-6 p-4 bg-gray-50 rounded border'>
+                <img v-if='searchResult.poster !== "N/A"' :src='searchResult.poster' class='w-32 h-auto rounded shadow' />
+                <div class='flex-1'>
+                    <div class='flex justify-between items-start'>
+                        <div>
+                            <h3 class='text-2xl font-bold'>{{ searchResult.title }} <span class='text-gray-400 font-normal'>({{ searchResult.year }})</span></h3>
+                            <p class='text-sm text-indigo-600 font-medium'>{{ searchResult.genre }}</p>
+                        </div>
+                        <div class='text-center bg-white p-3 rounded shadow border'>
+                            <p class='text-xs text-gray-500 uppercase font-bold'>Match Score</p>
+                            <p class='text-3xl font-black text-indigo-600'>{{ searchResult.match.total_score }}</p>
+                        </div>
+                    </div>
+                    <p class='mt-4 text-gray-700'>{{ searchResult.plot }}</p>
+                    <div class='mt-4 flex flex-wrap gap-2'>
+                        <span v-for='reason in searchResult.match.breakdown' :key='reason' class='text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded'>
+                            {{ reason }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <p v-if='searchError' class='mt-4 text-red-500 text-sm'>{{ searchError }}</p>
+        </div>
+
         <!-- Top Talent & Genres -->
         <div class='mt-8 grid grid-cols-1 md:grid-cols-2 gap-8' v-if='(people && people.length > 0) || (genres && genres.length > 0)'>
             <div class='p-6 bg-white rounded shadow'>
@@ -110,7 +145,31 @@
                 const selectedFile = ref(null)
                 const uploading = ref(false)
                 const enriching = ref(false)
+                const searching = ref(false)
                 const uploadStatus = ref('')
+                const searchQuery = ref('')
+                const searchResult = ref(null)
+                const searchError = ref('')
+
+                const searchNewMedia = async () => {
+                    if (!searchQuery.value) return
+                    searching.value = true
+                    searchError.value = ''
+                    searchResult.value = null
+                    try {
+                        const res = await fetch(`http://localhost:5000/api/discover?q=${encodeURIComponent(searchQuery.value)}`)
+                        if (res.ok) {
+                            searchResult.value = await res.json()
+                        } else {
+                            const err = await res.json()
+                            searchError.value = err.error || 'No results found'
+                        }
+                    } catch (e) {
+                        searchError.value = 'Error reaching the server'
+                    } finally {
+                        searching.value = false
+                    }
+                }
 
                 const fetchGenreStats = async () => {
                     try {
@@ -205,7 +264,7 @@
                     }
                 })
 
-                return { title, message, health, media, people, genres, selectedFile, uploading, enriching, uploadStatus, handleFileUpload, uploadFile, enrichData, fetchMedia }
+                return { title, message, health, media, people, genres, selectedFile, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia }
             }
         }).mount('#app')
     </script>

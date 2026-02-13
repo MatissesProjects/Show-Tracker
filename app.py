@@ -98,6 +98,34 @@ def create_app():
             return jsonify(stats), 200
         except Exception as e:
             return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/discover', methods=['GET'])
+    def discover_media():
+        from flask import request
+        from utils.omdb import OMDBClient
+        from utils.recommender import get_user_taste_profile, calculate_match_score
+        
+        query = request.args.get('q')
+        if not query:
+            return jsonify({'error': 'No search query provided'}), 400
+            
+        client = OMDBClient()
+        data = client.search_by_title(query)
+        
+        if not data:
+            return jsonify({'error': 'No results found'}), 404
+            
+        profile = get_user_taste_profile()
+        score_data = calculate_match_score(data, profile)
+        
+        return jsonify({
+            'title': data.get('Title'),
+            'year': data.get('Year'),
+            'genre': data.get('Genre'),
+            'plot': data.get('Plot'),
+            'poster': data.get('Poster'),
+            'match': score_data
+        })
         
     return app
 
