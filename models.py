@@ -20,6 +20,7 @@ class Media(db.Model):
     genres = db.Column(db.String(200))
     rating = db.Column(db.String(10))
     runtime = db.Column(db.String(50))
+    user_rating = db.Column(db.Integer, default=0) # 1 for thumbs up, -1 for thumbs down, 0 for neutral
     
     # Relationship via association object
     person_memberships = db.relationship("MediaPerson", back_populates="media", cascade="all, delete-orphan")
@@ -38,5 +39,6 @@ class WatchHistory(db.Model):
     media_id = db.Column(db.Integer, db.ForeignKey('media.id'), nullable=False)
     watch_date = db.Column(db.DateTime, server_default=db.func.now())
     platform = db.Column(db.String(50))
+    netflix_sentiment = db.Column(db.String(20)) # 'liked', 'disliked', etc.
     
     media = db.relationship('Media', backref=db.backref('watch_entries', lazy=True))

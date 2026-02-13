@@ -78,7 +78,8 @@ def create_app():
             'release_date': m.release_date,
             'rating': m.rating,
             'genres': m.genres,
-            'runtime': m.runtime
+            'runtime': m.runtime,
+            'user_rating': m.user_rating
         } for m in media_list])
 
     @app.route('/api/stats/people', methods=['GET'])
@@ -89,6 +90,22 @@ def create_app():
             return jsonify(stats), 200
         except Exception as e:
             return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/media/<int:media_id>/rate', methods=['POST'])
+    def rate_media(media_id):
+        from flask import request
+        from models import Media
+        rating = request.json.get('rating') # 1, -1, or 0
+        if rating not in [1, -1, 0]:
+            return jsonify({'error': 'Invalid rating'}), 400
+            
+        media = Media.query.get(media_id)
+        if not media:
+            return jsonify({'error': 'Media not found'}), 404
+            
+        media.user_rating = rating
+        db.session.commit()
+        return jsonify({'message': 'Rating updated successfully'}), 200
 
     @app.route('/api/stats/genres', methods=['GET'])
     def get_genre_stats_api():

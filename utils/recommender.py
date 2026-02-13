@@ -1,12 +1,23 @@
 from utils.analyzer import get_top_people, get_genre_stats
+from models import Media, MediaPerson, Person
+from database import db
 
 def get_user_taste_profile():
     """
     Aggregates the user's preferences into a weight map.
+    Includes bonuses for user-rated (thumbs up/down) media.
     """
-    top_people = get_top_people(limit=50)
+    top_people = get_top_people(limit=100)
     genre_stats = get_genre_stats()
     
+    # Get people the user explicitly liked (thumbs up)
+    liked_people_ids = db.session.query(MediaPerson.person_id).join(Media).filter(Media.user_rating == 1).distinct().all()
+    liked_people_ids = [p[0] for p in liked_people_ids]
+
+    # Get people the user explicitly disliked (thumbs down)
+    disliked_people_ids = db.session.query(MediaPerson.person_id).join(Media).filter(Media.user_rating == -1).distinct().all()
+    disliked_people_ids = [p[0] for p in disliked_people_ids]
+
     # Map for quick lookup
     people_weights = {p['name']: p['count'] for p in top_people}
     
@@ -19,13 +30,14 @@ def get_user_taste_profile():
         
     return {
         'people': people_weights,
-        'genres': genre_weights
+        'genres': genre_weights,
+        'liked_people_ids': liked_people_ids,
+        'disliked_people_ids': disliked_people_ids
     }
 
 def calculate_match_score(media_data, profile):
     """
-    Scores a piece of media (from OMDb or DB) against the taste profile.
-    media_data should have: 'Actors', 'Director', 'Writer', 'Genre', 'imdbRating'
+    Scores a piece of media against the taste profile.
     """
     score = 0
     details = []
@@ -37,12 +49,25 @@ def calculate_match_score(media_data, profile):
         if val and val != 'N/A':
             people_in_media.extend([p.split(' (')[0].strip() for p in val.split(', ')])
             
-    for person in set(people_in_media):
-        if person in profile['people']:
-            count = profile['people'][person]
+    for person_name in set(people_in_media):
+        # We need to find the person's ID to check explicit likes/dislikes
+        person_obj = Person.query.filter_by(name=person_name).first()
+        
+        if person_obj:
+            if person_obj.id in profile['disliked_people_ids']:
+                score -= 20
+                details.append(f"Contains {person_name} (Disliked Talent) (-20)")
+                continue # Skip positive points
+            
+            if person_obj.id in profile['liked_people_ids']:
+                score += 20
+                details.append(f"Contains {person_name} (Liked Talent) (+20)")
+            
+        if person_name in profile['people']:
+            count = profile['people'][person_name]
             points = 10 if count > 5 else 5
             score += points
-            details.append(f"Matched {person} (+{points})")
+            details.append(f"Matched {person_name} (+{points})")
             
     # 2. Score Genres
     genres = media_data.get('Genre', '').split(', ')
@@ -52,13 +77,12 @@ def calculate_match_score(media_data, profile):
             points = round(profile['genres'][genre], 1)
             genre_score += points
             
-    # Cap genre score contribution to 40
     genre_score = min(genre_score, 40)
     if genre_score > 0:
         score += genre_score
         details.append(f"Genre Match (+{genre_score})")
         
-    # 3. Add IMDb Rating (up to 10 points)
+    # 3. Add IMDb Rating
     try:
         rating = float(media_data.get('imdbRating', 0))
         score += rating
