@@ -93,7 +93,8 @@ def create_app():
                 'rating': m.rating,
                 'genres': m.genres,
                 'runtime': m.runtime,
-                'user_rating': m.user_rating
+                'user_rating': m.user_rating,
+                'in_watchlist': m.in_watchlist
             } for m in media_list.items],
             'total': total,
             'page': page,
@@ -121,6 +122,26 @@ def create_app():
         db.session.commit()
         return jsonify({'message': 'Rating updated'}), 200
 
+    @app.route('/api/media/<int:media_id>/watchlist', methods=['POST'])
+    def toggle_watchlist(media_id):
+        from models import Media
+        media = Media.query.get(media_id)
+        if not media: return jsonify({'error': 'Media not found'}), 404
+        media.in_watchlist = not media.in_watchlist
+        db.session.commit()
+        return jsonify({'message': 'Watchlist updated', 'in_watchlist': media.in_watchlist}), 200
+
+    @app.route('/api/watchlist', methods=['GET'])
+    def get_watchlist():
+        from models import Media
+        items = Media.query.filter_by(in_watchlist=True).all()
+        return jsonify([{
+            'id': m.id,
+            'title': m.title,
+            'media_type': m.media_type,
+            'poster': m.tmdb_id # We'll repurpose this for now if needed, or handle in frontend
+        } for m in items]), 200
+
     @app.route('/api/media/rate-external', methods=['POST'])
     def rate_external_media():
         from flask import request
@@ -130,9 +151,9 @@ def create_app():
         
         data = request.json
         title = data.get('title')
-        rating = data.get('rating')
+        rating = data.get('rating') # can be 1, -1, or 0
         
-        if not title or rating not in [1, -1]:
+        if not title or rating not in [1, -1, 0]:
             return jsonify({'error': 'Invalid data'}), 400
             
         media = Media.query.filter_by(title=title).first()
@@ -148,8 +169,12 @@ def create_app():
                 apply_metadata(media, omdb_data, db)
         
         media.user_rating = rating
+        # If rating from external suggestions, we implicitly add to watchlist if it's a 0 or 1
+        if rating >= 0:
+            media.in_watchlist = True
+            
         db.session.commit()
-        return jsonify({'message': 'External media rated and saved'}), 200
+        return jsonify({'message': 'External media saved to library/watchlist'}), 200
 
     @app.route('/api/stats/genres', methods=['GET'])
     def get_genre_stats_api():
