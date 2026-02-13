@@ -8,7 +8,7 @@
 ## Backend / API
 - **Runtime**: Python (Flask)
 - **API Style**: RESTful API
-- **External API**: TMDB API for movie/show data
+- **External API**: OMDb API for movie/show data
 
 ## Database
 - **Type**: SQLite (Simple, file-based relational database)
