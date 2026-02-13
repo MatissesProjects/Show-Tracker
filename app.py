@@ -63,13 +63,15 @@ def create_app():
         from models import Media
         from sqlalchemy import func
         # Group by title to show unique shows/movies
-        # We use a subquery to find the latest ID for each unique title
         subquery = db.session.query(
             func.max(Media.id).label('max_id')
         ).group_by(Media.title).subquery()
         
-        # We also limit to 50 for the UI but you can adjust this
-        media_list = Media.query.filter(Media.id.in_(subquery)).order_by(Media.id.desc()).limit(100).all()
+        # Order by unrated first, then by most recently added
+        media_list = Media.query.filter(Media.id.in_(subquery)).order_by(
+            Media.user_rating == 0, func.desc(Media.user_rating == 0), 
+            Media.id.desc()
+        ).limit(100).all()
         
         return jsonify([{
             'id': m.id,
