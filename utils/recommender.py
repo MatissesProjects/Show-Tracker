@@ -40,22 +40,26 @@ def calculate_match_score(media_data, profile):
     if isinstance(actors, list):
         people_in_media = actors
     else:
-        people_in_media = [p.split(' (')[0].strip() for p in actors.split(', ') if p]
+        # Check for TVmaze embedded cast
+        if '_embedded' in media_data and 'cast' in media_data['_embedded']:
+            people_in_media = [c['person']['name'] for c in media_data['_embedded']['cast']]
+        else:
+            people_in_media = [p.split(' (')[0].strip() for p in actors.split(', ') if p]
             
     for person_name in set(people_in_media):
         person_obj = Person.query.filter_by(name=person_name).first()
         if person_obj:
             if person_obj.id in profile['disliked_people_ids']:
-                score -= 20
-                details.append(f"Contains {person_name} (Disliked Talent) (-20)")
+                score -= 30
+                details.append(f"Contains {person_name} (Disliked Talent) (-30)")
                 continue
             if person_obj.id in profile['liked_people_ids']:
-                score += 20
-                details.append(f"Contains {person_name} (Liked Talent) (+20)")
+                score += 25
+                details.append(f"Contains {person_name} (Liked Talent) (+25)")
             
         if person_name in profile['people']:
             count = profile['people'][person_name]
-            points = 10 if count > 5 else 5
+            points = 15 if count > 5 else 8
             score += points
             details.append(f"Matched {person_name} (+{points})")
             
@@ -66,35 +70,32 @@ def calculate_match_score(media_data, profile):
             points = round(profile['genres'][genre], 1)
             genre_score += points
             
-    genre_score = min(genre_score, 40)
+    genre_score = min(genre_score, 45)
     if genre_score > 0:
         score += genre_score
         details.append(f"Genre Match (+{genre_score})")
         
     try:
-        score += float(rating)
-        details.append(f"Rating (+{rating})")
+        r_val = float(rating)
+        score += r_val
+        details.append(f"Rating (+{r_val})")
     except: pass
         
     return {'total_score': round(score, 1), 'breakdown': details}
 
-def get_proactive_suggestions(db_instance, limit=6):
-    """Finds new suggestions using TVmaze to search by top talent."""
+def get_proactive_suggestions(db_instance, limit=15):
+    """Finds more diverse suggestions using TVmaze."""
     profile = get_user_taste_profile()
-    # Get top 5 people
-    top_talent = sorted(profile['people'].items(), key=lambda x: x[1], reverse=True)[:5]
+    top_talent = sorted(profile['people'].items(), key=lambda x: x[1], reverse=True)[:8]
     
     suggestions = []
     seen_titles = set([m.title.lower() for m in db_instance.session.query(Media.title).all()])
     
     for person_name, count in top_talent:
-        # 1. Search for the person on TVmaze to get their ID
         person_res = requests.get(f"https://api.tvmaze.com/search/people?q={person_name}")
         if not person_res.ok or not person_res.json(): continue
         
         person_id = person_res.json()[0]['person']['id']
-        
-        # 2. Get their cast credits
         credits_res = requests.get(f"https://api.tvmaze.com/people/{person_id}/castcredits?embed=show")
         if not credits_res.ok: continue
         
@@ -103,17 +104,21 @@ def get_proactive_suggestions(db_instance, limit=6):
             title = show['name']
             
             if title.lower() not in seen_titles:
+                # Add cast to show data for better scoring
+                show['cast'] = [person_name] 
                 score_data = calculate_match_score(show, profile)
+                
                 suggestions.append({
                     'title': title,
                     'year': show.get('premiered', '')[:4],
                     'genre': ', '.join(show.get('genres', [])),
                     'poster': (show.get('image') or {}).get('medium'),
-                    'match': score_data
+                    'match': score_data,
+                    'summary': show.get('summary', '').replace('<p>', '').replace('</p>', '').replace('<b>', '').replace('</b>', '')
                 })
                 seen_titles.add(title.lower())
                 
             if len(suggestions) >= limit: break
         if len(suggestions) >= limit: break
             
-    return sorted(suggestions, key=lambda x: x['match']['total_score'], reverse=True)[:limit]
+    return sorted(suggestions, key=lambda x: x['match']['total_score'], reverse=True)

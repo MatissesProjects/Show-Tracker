@@ -9,7 +9,8 @@
     <style>
         [v-cloak] { display: none; }
         .gradient-bg { background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%); }
-        .card-hover:hover { transform: translateY(-4px); }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body class='bg-slate-50 text-slate-900 font-sans'>
@@ -37,218 +38,232 @@
             <div class='flex flex-col md:flex-row justify-between items-start gap-6 mb-12'>
                 <div>
                     <h2 class='text-3xl font-bold'>Welcome Back</h2>
-                    <p class='text-slate-500 mt-1'>Analyzing your library of {{ media.length }} unique titles.</p>
+                    <p class='text-slate-500 mt-1'>Analyzing your library of {{ totalMedia }} unique titles.</p>
                 </div>
                 
                 <div class='flex gap-3'>
-                    <label class='bg-white border-2 border-slate-200 hover:border-indigo-500 px-4 py-2 rounded-xl cursor-pointer transition-all flex items-center gap-2 font-semibold text-slate-700'>
+                    <label class='bg-white border-2 border-slate-200 hover:border-indigo-500 px-4 py-2 rounded-xl cursor-pointer transition-all flex items-center gap-2 font-semibold text-slate-700 shadow-sm'>
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                         </svg>
                         Import Netflix
                         <input type='file' @change='handleFileUpload' class='hidden' />
                     </label>
-                    <button @click='enrichData' :disabled='enriching' class='bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-xl font-bold transition-all disabled:opacity-50 flex items-center gap-2'>
+                    <button @click='enrichData' :disabled='enriching' class='bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-xl font-bold transition-all disabled:opacity-50 flex items-center gap-2 shadow-indigo-200 shadow-lg'>
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
-                        {{ enriching ? 'Enriching...' : 'Enrich with OMDb' }}
+                        {{ enriching ? 'Enriching...' : 'Enrich Data' }}
                     </button>
                 </div>
             </div>
 
-            <p v-if='uploadStatus' class='mb-8 p-4 rounded-xl border-l-4' :class='uploadStatus.includes("Error") ? "bg-red-50 border-red-500 text-red-700" : "bg-green-50 border-green-500 text-green-700"'>
+            <p v-if='uploadStatus' class='mb-8 p-4 rounded-xl border-l-4 shadow-sm' :class='uploadStatus.includes("Error") ? "bg-red-50 border-red-500 text-red-700" : "bg-green-50 border-green-500 text-green-700"'>
                 {{ uploadStatus }}
             </p>
 
-            <div class='grid grid-cols-1 lg:grid-cols-3 gap-8'>
-                <!-- Left Column: Discovery & Suggestions -->
-                <div class='lg:col-span-2 space-y-8'>
-                    
+            <!-- Recommendations (Scrollable) -->
+            <section class='mb-12' v-if='suggestions && suggestions.length > 0'>
+                <div class='flex justify-between items-end mb-6 px-2'>
+                    <h3 class='text-2xl font-black flex items-center gap-3'>
+                        <span class='w-2 h-8 bg-indigo-600 rounded-full'></span>
+                        Suggested For You
+                    </h3>
+                    <div class='flex gap-2'>
+                        <button @click="scrollSuggestions(-1)" class="p-2 rounded-full bg-white shadow-sm border hover:bg-slate-50 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+                        </button>
+                        <button @click="scrollSuggestions(1)" class="p-2 rounded-full bg-white shadow-sm border hover:bg-slate-50 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                        </button>
+                    </div>
+                </div>
+                <div ref="suggestionScroll" class='flex gap-6 overflow-x-auto pb-8 pt-2 px-2 hide-scrollbar scroll-smooth'>
+                    <div v-for='s in suggestions' :key='s.title' class='flex-none w-72 bg-white rounded-3xl overflow-hidden shadow-md border border-slate-100 flex flex-col group relative'>
+                        <div class='relative h-80'>
+                            <img v-if='s.poster' :src='s.poster' class='w-full h-full object-cover transition-transform duration-700 group-hover:scale-110' />
+                            <div class='absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent'></div>
+                            
+                            <!-- Floating Controls -->
+                            <div class='absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300'>
+                                <button @click='rateExternal(s.title, 1)' class='bg-white/90 p-3 rounded-full text-green-600 shadow-lg hover:scale-110 transition-transform'>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20"><path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" /></svg>
+                                </button>
+                                <button @click='rateExternal(s.title, -1)' class='bg-white/90 p-3 rounded-full text-red-600 shadow-lg hover:scale-110 transition-transform'>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20"><path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.057 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" /></svg>
+                                </button>
+                            </div>
+
+                            <div class='absolute bottom-6 left-6 right-6'>
+                                <div class='flex justify-between items-end'>
+                                    <div class='flex-1'>
+                                        <p class='text-indigo-400 font-black text-[10px] uppercase tracking-widest mb-1'>{{ s.genre.split(',')[0] }}</p>
+                                        <h4 class='text-white text-xl font-black leading-tight'>{{ s.title }}</h4>
+                                    </div>
+                                    <div class='bg-indigo-600 text-white text-sm font-black px-3 py-1.5 rounded-2xl shadow-xl shadow-indigo-900/40 border border-indigo-400/30'>
+                                        {{ Math.round(s.match.total_score) }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class='p-6 flex-1 flex flex-col'>
+                            <p class='text-xs text-slate-500 font-medium mb-4'>{{ s.year }} • {{ s.genre }}</p>
+                            <div class='flex flex-wrap gap-1.5'>
+                                <span v-for='reason in s.match.breakdown.slice(0, 3)' :key='reason' class='text-[9px] font-bold bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg text-slate-500'>
+                                    {{ reason }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div class='grid grid-cols-1 lg:grid-cols-3 gap-12'>
+                <!-- Discovery & Stats -->
+                <div class='lg:col-span-2 space-y-12'>
                     <!-- Discovery Search -->
-                    <section class='bg-white rounded-3xl p-8 shadow-sm border border-slate-100'>
-                        <h3 class='text-xl font-bold mb-6 flex items-center gap-2'>
-                            <span class='text-indigo-600'>●</span> Discover New Media
+                    <section class='bg-white rounded-3xl p-10 shadow-xl shadow-slate-200/50 border border-slate-100'>
+                        <h3 class='text-2xl font-black mb-8 flex items-center gap-3'>
+                            <span class='text-indigo-600 text-3xl'>●</span> Discover New Media
                         </h3>
-                        <div class='flex gap-3 p-1.5 bg-slate-50 rounded-2xl border border-slate-100 focus-within:ring-2 ring-indigo-500/20 transition-all'>
-                            <input type='text' v-model='searchQuery' @keyup.enter='searchNewMedia' placeholder='Search for a movie or show...' class='flex-1 bg-transparent px-4 py-2 outline-none' />
-                            <button @click='searchNewMedia' :disabled='searching' class='bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-indigo-700 transition-colors'>
+                        <div class='flex gap-4 p-2 bg-slate-50 rounded-2xl border-2 border-slate-50 focus-within:border-indigo-500/30 focus-within:bg-white transition-all'>
+                            <input type='text' v-model='searchQuery' @keyup.enter='searchNewMedia' placeholder='Search for a movie or show...' class='flex-1 bg-transparent px-6 py-3 text-lg outline-none' />
+                            <button @click='searchNewMedia' :disabled='searching' class='bg-indigo-600 text-white px-8 py-3 rounded-xl font-black hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all active:scale-95'>
                                 {{ searching ? '...' : 'Check Compatibility' }}
                             </button>
                         </div>
 
                         <!-- Search Result Card -->
-                        <div v-if='searchResult' class='mt-8 flex flex-col md:flex-row gap-8 p-6 bg-slate-50 rounded-2xl border border-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-300'>
+                        <div v-if='searchResult' class='mt-10 flex flex-col md:flex-row gap-10 p-8 bg-slate-50 rounded-3xl border border-slate-100 animate-in fade-in slide-in-from-bottom-4 duration-500'>
                             <div class='relative'>
-                                <img v-if='searchResult.poster !== "N/A"' :src='searchResult.poster' class='w-40 h-auto rounded-xl shadow-xl' />
-                                <div class='absolute -top-3 -right-3 bg-indigo-600 text-white w-12 h-12 rounded-full flex items-center justify-center font-black shadow-lg border-4 border-white'>
+                                <img v-if='searchResult.poster !== "N/A"' :src='searchResult.poster' class='w-48 h-auto rounded-2xl shadow-2xl' />
+                                <div class='absolute -top-4 -right-4 bg-indigo-600 text-white w-16 h-16 rounded-full flex items-center justify-center text-xl font-black shadow-xl border-4 border-white'>
                                     {{ Math.round(searchResult.match.total_score) }}
                                 </div>
                             </div>
                             <div class='flex-1'>
-                                <h4 class='text-2xl font-black'>{{ searchResult.title }} <span class='text-slate-400 font-normal'>({{ searchResult.year }})</span></h4>
-                                <p class='text-indigo-600 font-bold text-sm tracking-wide uppercase mt-1'>{{ searchResult.genre }}</p>
-                                <p class='mt-4 text-slate-600 leading-relaxed'>{{ searchResult.plot }}</p>
-                                <div class='mt-6 flex flex-wrap gap-2'>
-                                    <span v-for='reason in searchResult.match.breakdown' :key='reason' class='text-xs bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg shadow-sm'>
+                                <h4 class='text-3xl font-black'>{{ searchResult.title }} <span class='text-slate-400 font-normal'>({{ searchResult.year }})</span></h4>
+                                <p class='text-indigo-600 font-black text-sm tracking-widest uppercase mt-2'>{{ searchResult.genre }}</p>
+                                <p class='mt-6 text-slate-600 text-lg leading-relaxed italic'>"{{ searchResult.plot }}"</p>
+                                <div class='mt-8 flex flex-wrap gap-3'>
+                                    <span v-for='reason in searchResult.match.breakdown' :key='reason' class='text-xs font-bold bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-xl shadow-sm'>
                                         {{ reason }}
                                     </span>
                                 </div>
                             </div>
                         </div>
-                        <p v-if='searchError' class='mt-4 text-red-500 text-sm'>{{ searchError }}</p>
+                        <p v-if='searchError' class='mt-6 text-red-500 font-bold'>{{ searchError }}</p>
                     </section>
 
-                    <!-- Recommendations Grid -->
-                    <section class='space-y-6' v-if='suggestions && suggestions.length > 0'>
-                        <h3 class='text-xl font-bold flex items-center gap-2'>
-                            <span class='text-green-500'>●</span> Recommended For You
-                        </h3>
-                        <div class='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6'>
-                            <div v-for='s in suggestions' :key='s.title' class='bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100 flex flex-col transition-all hover:shadow-xl hover:-translate-y-1 group'>
-                                <div class='relative h-56 overflow-hidden'>
-                                    <img v-if='s.poster !== "N/A"' :src='s.poster' class='w-full h-full object-cover transition-transform duration-500 group-hover:scale-110' />
-                                    <div class='absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent'></div>
-                                    <div class='absolute bottom-4 left-4 right-4 flex justify-between items-end'>
-                                        <div>
-                                            <p class='text-[10px] font-bold text-indigo-300 uppercase tracking-widest'>{{ s.genre.split(',')[0] }}</p>
-                                            <h4 class='text-white font-black leading-tight'>{{ s.title }}</h4>
-                                        </div>
-                                        <div class='bg-indigo-600 text-white text-xs font-black px-2 py-1 rounded-lg'>
-                                            {{ Math.round(s.match.total_score) }}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class='p-4 flex-1 flex flex-col justify-between'>
-                                    <p class='text-xs text-slate-500'>{{ s.year }} • {{ s.genre }}</p>
-                                    <div class='mt-4 flex flex-wrap gap-1'>
-                                        <span v-for='reason in s.match.breakdown.slice(0, 2)' :key='reason' class='text-[9px] bg-slate-50 border border-slate-100 px-2 py-1 rounded-md text-slate-500 truncate max-w-full'>
-                                            {{ reason }}
-                                        </span>
-                                    </div>
-                                </div>
+                    <!-- Full Media List -->
+                    <section class='bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden'>
+                        <div class='p-10 flex justify-between items-center border-b border-slate-50'>
+                            <h3 class='text-2xl font-black'>Your Library</h3>
+                            <div class='flex items-center gap-6'>
+                                <span class='text-sm font-bold text-slate-400 uppercase tracking-widest'>Page {{ currentPage }} / {{ totalPages }}</span>
+                                <button @click='fetchMedia' class='text-indigo-600 font-black text-sm hover:underline'>Refresh Activity</button>
                             </div>
+                        </div>
+                        <div class='overflow-x-auto'>
+                            <table class='w-full text-left border-collapse'>
+                                <thead>
+                                    <tr class='bg-slate-50/50 text-slate-400 text-[10px] uppercase tracking-widest font-black'>
+                                        <th class='px-10 py-6'>Media Info</th>
+                                        <th class='px-10 py-6'>Metadata</th>
+                                        <th class='px-10 py-6 text-center'>Rating</th>
+                                        <th class='px-10 py-6 text-right'>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class='divide-y divide-slate-50'>
+                                    <tr v-for='item in media' :key='item.id' class='hover:bg-indigo-50/30 transition-colors group'>
+                                        <td class='px-10 py-6'>
+                                            <p class='font-black text-slate-800 text-lg'>{{ item.title }}</p>
+                                            <p class='text-xs font-bold text-indigo-400 uppercase tracking-wider'>{{ item.media_type }}</p>
+                                        </td>
+                                        <td class='px-10 py-6'>
+                                            <p class='text-xs font-bold text-slate-600'>{{ item.genres || '...' }}</p>
+                                            <p class='text-[10px] font-medium text-slate-400 mt-1'>{{ item.release_date || 'Unknown' }}</p>
+                                        </td>
+                                        <td class='px-10 py-6 text-center'>
+                                            <span v-if='item.rating && item.rating !== "N/A"' class='bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg text-[10px] font-black shadow-sm'>
+                                                {{ item.rating }}
+                                            </span>
+                                            <span v-else class='text-slate-300'>--</span>
+                                        </td>
+                                        <td class='px-10 py-6 text-right'>
+                                            <div class='flex justify-end items-center gap-6'>
+                                                <div class='flex gap-2'>
+                                                    <button @click='rateMedia(item.id, 1)' :class='item.user_rating === 1 ? "text-green-500 scale-125" : "text-slate-300 hover:text-green-400"' class='transition-all duration-300 hover:scale-110'>
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 20 20" fill="currentColor"><path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" /></svg>
+                                                    </button>
+                                                    <button @click='rateMedia(item.id, -1)' :class='item.user_rating === -1 ? "text-red-500 scale-125" : "text-slate-300 hover:text-red-400"' class='transition-all duration-300 hover:scale-110'>
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 20 20" fill="currentColor"><path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.057 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" /></svg>
+                                                    </button>
+                                                </div>
+                                                <div class='w-2.5 h-2.5 rounded-full shadow-sm' :class='item.media_type !== "unknown" ? "bg-green-500 animate-pulse" : "bg-slate-200"'></div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <!-- Pagination Footer -->
+                        <div class='p-10 bg-slate-50/50 border-t border-slate-100 flex justify-center items-center gap-6'>
+                            <button @click='changePage(currentPage - 1)' :disabled='currentPage === 1' class='p-3 rounded-2xl bg-white border border-slate-200 text-slate-600 disabled:opacity-30 hover:bg-slate-50 transition-all hover:scale-105 active:scale-95 shadow-sm'>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+                            </button>
+                            <div class='flex gap-3'>
+                                <button v-for='p in visiblePages' :key='p' @click='changePage(p)' :class='p === currentPage ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200 border-indigo-600 scale-110" : "bg-white text-slate-600 border border-slate-200"' class='w-12 h-12 rounded-2xl font-black text-sm transition-all hover:border-indigo-400'>
+                                    {{ p }}
+                                </button>
+                            </div>
+                            <button @click='changePage(currentPage + 1)' :disabled='currentPage === totalPages' class='p-3 rounded-2xl bg-white border border-slate-200 text-slate-600 disabled:opacity-30 hover:bg-slate-50 transition-all hover:scale-105 active:scale-95 shadow-sm'>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                            </button>
                         </div>
                     </section>
                 </div>
 
-                <!-- Right Column: Stats & Analytics -->
-                <div class='space-y-8'>
+                <!-- Right Column: Analytics -->
+                <div class='space-y-12'>
                     <!-- Top People -->
-                    <section class='bg-white rounded-3xl p-8 shadow-sm border border-slate-100'>
-                        <h3 class='text-xl font-bold mb-6'>Top Talent</h3>
-                        <div class='space-y-4'>
-                            <div v-for='p in people.slice(0, 8)' :key='p.name + p.role' class='flex justify-between items-center group'>
+                    <section class='bg-white rounded-[2rem] p-10 shadow-xl shadow-slate-200/50 border border-slate-100'>
+                        <h3 class='text-2xl font-black mb-8 flex items-center gap-3'>Top Talent</h3>
+                        <div class='space-y-6'>
+                            <div v-for='p in people.slice(0, 10)' :key='p.name + p.role' class='flex justify-between items-center group cursor-default'>
                                 <div>
-                                    <p class='font-bold group-hover:text-indigo-600 transition-colors'>{{ p.name }}</p>
-                                    <p class='text-[10px] uppercase tracking-widest text-slate-400 font-bold'>{{ p.role }}</p>
+                                    <p class='font-black text-slate-800 group-hover:text-indigo-600 transition-colors'>{{ p.name }}</p>
+                                    <p class='text-[10px] uppercase tracking-[0.2em] text-slate-400 font-black'>{{ p.role }}</p>
                                 </div>
-                                <div class='bg-slate-50 px-3 py-1 rounded-full text-xs font-black text-slate-500'>
+                                <div class='bg-indigo-50 px-4 py-1.5 rounded-2xl text-[10px] font-black text-indigo-600 border border-indigo-100'>
                                     {{ p.count }}
                                 </div>
                             </div>
                         </div>
                     </section>
 
-                    <!-- Top Genres -->
-                    <section class='bg-white rounded-3xl p-8 shadow-sm border border-slate-100'>
-                        <h3 class='text-xl font-bold mb-6'>Genres</h3>
-                        <div class='flex flex-wrap gap-2'>
-                            <div v-for='g in genres.slice(0, 12)' :key='g.name' class='bg-slate-50 hover:bg-indigo-50 border border-slate-100 px-4 py-2 rounded-xl transition-colors cursor-default'>
-                                <span class='text-sm font-bold text-slate-700'>{{ g.name }}</span>
-                                <span class='ml-2 text-[10px] text-slate-400'>{{ g.count }}</span>
+                    <!-- Genres -->
+                    <section class='bg-white rounded-[2rem] p-10 shadow-xl shadow-slate-200/50 border border-slate-100'>
+                        <h3 class='text-2xl font-black mb-8'>Genres</h3>
+                        <div class='flex flex-wrap gap-3'>
+                            <div v-for='g in genres.slice(0, 15)' :key='g.name' class='bg-slate-50 hover:bg-indigo-600 hover:text-white border border-slate-100 px-5 py-2.5 rounded-2xl transition-all cursor-default group transform hover:-rotate-2'>
+                                <span class='text-sm font-black'>{{ g.name }}</span>
+                                <span class='ml-2 text-[10px] text-slate-400 group-hover:text-indigo-200'>{{ g.count }}</span>
                             </div>
                         </div>
                     </section>
                 </div>
             </div>
-
-            <!-- Bottom Section: Full Media List -->
-            <section class='mt-12 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden'>
-                <div class='p-8 flex justify-between items-center border-b border-slate-50'>
-                    <h3 class='text-xl font-bold'>Your Library</h3>
-                    <div class='flex items-center gap-4'>
-                        <span class='text-xs text-slate-400'>Page {{ currentPage }} of {{ totalPages }}</span>
-                        <button @click='fetchMedia' class='text-indigo-600 font-bold text-sm hover:underline'>Refresh Activity</button>
-                    </div>
-                </div>
-                <div class='overflow-x-auto'>
-                    <table class='w-full text-left'>
-                        <!-- ... thead remains same ... -->
-                        <thead>
-                            <tr class='bg-slate-50/50 text-slate-400 text-[10px] uppercase tracking-widest font-black'>
-                                <th class='px-8 py-4'>Media Info</th>
-                                <th class='px-8 py-4'>Metadata</th>
-                                <th class='px-8 py-4 text-center'>Rating</th>
-                                <th class='px-8 py-4 text-right'>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class='divide-y divide-slate-50'>
-                            <tr v-for='item in media' :key='item.id' class='hover:bg-slate-50/50 transition-colors'>
-                                <td class='px-8 py-5'>
-                                    <p class='font-bold text-slate-800'>{{ item.title }}</p>
-                                    <p class='text-xs text-slate-400 capitalize'>{{ item.media_type }}</p>
-                                </td>
-                                <td class='px-8 py-5'>
-                                    <p class='text-xs font-semibold text-slate-600'>{{ item.genres || '...' }}</p>
-                                    <p class='text-[10px] text-slate-400 mt-1'>{{ item.release_date || 'Unknown Date' }}</p>
-                                </td>
-                                <td class='px-8 py-5 text-center'>
-                                    <span v-if='item.rating && item.rating !== "N/A"' class='bg-amber-100 text-amber-700 px-2 py-1 rounded text-[10px] font-black'>
-                                        {{ item.rating }}
-                                    </span>
-                                    <span v-else class='text-slate-300'>--</span>
-                                </td>
-                                <td class='px-8 py-5 text-right'>
-                                    <div class='flex justify-end items-center gap-4'>
-                                        <div class='flex gap-1'>
-                                            <button @click='rateMedia(item.id, 1)' :class='item.user_rating === 1 ? "text-green-500 scale-125" : "text-slate-300 hover:text-green-400"' class='transition-all duration-300'>
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                                                    <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" />
-                                                </svg>
-                                            </button>
-                                            <button @click='rateMedia(item.id, -1)' :class='item.user_rating === -1 ? "text-red-500 scale-125" : "text-slate-300 hover:text-red-400"' class='transition-all duration-300'>
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                                                    <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.057 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z" />
-                                                </svg>
-                                            </button>
-                                        </div>
-                                        <div class='w-2 h-2 rounded-full' :class='item.media_type !== "unknown" ? "bg-green-500" : "bg-slate-200"'></div>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                <!-- Pagination Footer -->
-                <div class='p-6 bg-slate-50 border-t border-slate-100 flex justify-center items-center gap-4'>
-                    <button @click='changePage(currentPage - 1)' :disabled='currentPage === 1' class='p-2 rounded-lg bg-white border border-slate-200 text-slate-600 disabled:opacity-30 hover:bg-slate-50 transition-colors'>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                        </svg>
-                    </button>
-                    <div class='flex gap-2'>
-                        <button v-for='p in visiblePages' :key='p' @click='changePage(p)' :class='p === currentPage ? "bg-indigo-600 text-white" : "bg-white text-slate-600 border border-slate-200"' class='w-10 h-10 rounded-lg font-bold text-sm transition-all'>
-                            {{ p }}
-                        </button>
-                    </div>
-                    <button @click='changePage(currentPage + 1)' :disabled='currentPage === totalPages' class='p-2 rounded-lg bg-white border border-slate-200 text-slate-600 disabled:opacity-30 hover:bg-slate-50 transition-colors'>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                        </svg>
-                    </button>
-                </div>
-            </section>
         </main>
     </div>
 
     <script>
-        const { createApp, ref, onMounted } = Vue
+        const { createApp, ref, onMounted, computed } = Vue
         createApp({
             setup() {
-                const title = ref('Show Tracker')
                 const health = ref(null)
                 const media = ref([])
+                const totalMedia = ref(0)
                 const people = ref([])
                 const genres = ref([])
                 const suggestions = ref([])
@@ -263,15 +278,37 @@
                 const searchQuery = ref('')
                 const searchResult = ref(null)
                 const searchError = ref('')
+                const suggestionScroll = ref(null)
 
                 const fetchSuggestions = async () => {
                     try {
                         const res = await fetch('http://localhost:5000/api/suggestions')
                         const data = await res.json()
                         suggestions.value = Array.isArray(data) ? data : []
-                    } catch (e) {
-                        console.error('Failed to fetch suggestions', e)
+                    } catch (e) { console.error('Failed suggestions', e) }
+                }
+
+                const scrollSuggestions = (direction) => {
+                    if (suggestionScroll.value) {
+                        suggestionScroll.value.scrollLeft += direction * 400
                     }
+                }
+
+                const rateExternal = async (title, rating) => {
+                    try {
+                        const res = await fetch('http://localhost:5000/api/media/rate-external', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ title, rating })
+                        })
+                        if (res.ok) {
+                            // Find the suggestion and remove it or update its status
+                            suggestions.value = suggestions.value.filter(s => s.title !== title)
+                            await fetchMedia()
+                            await fetchPeopleStats()
+                            await fetchSuggestions()
+                        }
+                    } catch (e) { console.error('Rate external failed', e) }
                 }
 
                 const searchNewMedia = async () => {
@@ -287,11 +324,7 @@
                             const err = await res.json()
                             searchError.value = err.error || 'No results found'
                         }
-                    } catch (e) {
-                        searchError.value = 'Error reaching the server'
-                    } finally {
-                        searching.value = false
-                    }
+                    } catch (e) { searchError.value = 'Server error' } finally { searching.value = false }
                 }
 
                 const fetchGenreStats = async () => {
@@ -299,9 +332,7 @@
                         const res = await fetch('http://localhost:5000/api/stats/genres')
                         const data = await res.json()
                         genres.value = Array.isArray(data) ? data : []
-                    } catch (e) {
-                        console.error('Failed to fetch genre stats', e)
-                    }
+                    } catch (e) { console.error('Genre stats failed', e) }
                 }
 
                 const fetchPeopleStats = async () => {
@@ -309,9 +340,7 @@
                         const res = await fetch('http://localhost:5000/api/stats/people')
                         const data = await res.json()
                         people.value = Array.isArray(data) ? data : []
-                    } catch (e) {
-                        console.error('Failed to fetch people stats', e)
-                    }
+                    } catch (e) { console.error('People stats failed', e) }
                 }
 
                 const fetchMedia = async () => {
@@ -320,9 +349,8 @@
                         const data = await res.json()
                         media.value = data.items || []
                         totalPages.value = data.pages || 1
-                    } catch (e) {
-                        console.error('Failed to fetch media', e)
-                    }
+                        totalMedia.value = data.total || 0
+                    } catch (e) { console.error('Media fetch failed', e) }
                 }
 
                 const changePage = async (page) => {
@@ -332,8 +360,6 @@
                     }
                 }
 
-                // Computed for pagination display
-                const { computed } = Vue
                 const visiblePages = computed(() => {
                     const pages = []
                     let start = Math.max(1, currentPage.value - 2)
@@ -355,16 +381,12 @@
                             await fetchPeopleStats()
                             await fetchSuggestions()
                         }
-                    } catch (e) {
-                        console.error('Failed to update rating', e)
-                    }
+                    } catch (e) { console.error('Rate failed', e) }
                 }
 
                 const handleFileUpload = async (event) => {
                     selectedFile.value = event.target.files[0]
-                    if (selectedFile.value) {
-                        await uploadFile()
-                    }
+                    if (selectedFile.value) { await uploadFile() }
                 }
 
                 const uploadFile = async () => {
@@ -380,16 +402,12 @@
                         const result = await res.json()
                         uploadStatus.value = result.message
                         await fetchMedia()
-                    } catch (e) {
-                        uploadStatus.value = 'Error uploading file'
-                    } finally {
-                        uploading.value = false
-                    }
+                    } catch (e) { uploadStatus.value = 'Error uploading' } finally { uploading.value = false }
                 }
 
                 const enrichData = async () => {
                     enriching.value = true
-                    uploadStatus.value = 'Pulling rich metadata from OMDb...'
+                    uploadStatus.value = 'Pulling metadata...'
                     try {
                         const res = await fetch('http://localhost:5000/api/enrich', { method: 'POST' })
                         const result = await res.json()
@@ -398,11 +416,7 @@
                         await fetchPeopleStats()
                         await fetchGenreStats()
                         await fetchSuggestions()
-                    } catch (e) {
-                        uploadStatus.value = 'Error reaching the server'
-                    } finally {
-                        enriching.value = false
-                    }
+                    } catch (e) { uploadStatus.value = 'Error' } finally { enriching.value = false }
                 }
 
                 onMounted(async () => {
@@ -413,12 +427,10 @@
                         await fetchPeopleStats()
                         await fetchGenreStats()
                         await fetchSuggestions()
-                    } catch (e) {
-                        console.error('API not reachable', e)
-                    }
+                    } catch (e) { console.error('API Error', e) }
                 })
 
-                return { health, media, people, genres, suggestions, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages }
+                return { health, media, totalMedia, people, genres, suggestions, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal }
             }
         }).mount('#app')
     </script>

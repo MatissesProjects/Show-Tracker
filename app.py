@@ -111,19 +111,45 @@ def create_app():
 
     @app.route('/api/media/<int:media_id>/rate', methods=['POST'])
     def rate_media(media_id):
+        # ... (previous rate logic) ...
         from flask import request
         from models import Media
-        rating = request.json.get('rating') # 1, -1, or 0
-        if rating not in [1, -1, 0]:
-            return jsonify({'error': 'Invalid rating'}), 400
-            
+        rating = request.json.get('rating')
         media = Media.query.get(media_id)
-        if not media:
-            return jsonify({'error': 'Media not found'}), 404
-            
+        if not media: return jsonify({'error': 'Media not found'}), 404
         media.user_rating = rating
         db.session.commit()
-        return jsonify({'message': 'Rating updated successfully'}), 200
+        return jsonify({'message': 'Rating updated'}), 200
+
+    @app.route('/api/media/rate-external', methods=['POST'])
+    def rate_external_media():
+        from flask import request
+        from models import Media
+        from utils.omdb import OMDBClient
+        from utils.enricher import apply_metadata
+        
+        data = request.json
+        title = data.get('title')
+        rating = data.get('rating')
+        
+        if not title or rating not in [1, -1]:
+            return jsonify({'error': 'Invalid data'}), 400
+            
+        media = Media.query.filter_by(title=title).first()
+        if not media:
+            media = Media(title=title, media_type='unknown')
+            db.session.add(media)
+            db.session.flush()
+            
+            # Enrich immediately so the rating has context
+            client = OMDBClient()
+            omdb_data = client.search_by_title(title)
+            if omdb_data:
+                apply_metadata(media, omdb_data, db)
+        
+        media.user_rating = rating
+        db.session.commit()
+        return jsonify({'message': 'External media rated and saved'}), 200
 
     @app.route('/api/stats/genres', methods=['GET'])
     def get_genre_stats_api():
