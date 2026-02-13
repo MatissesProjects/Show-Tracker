@@ -92,6 +92,7 @@ def create_app():
                 'rating': m.rating,
                 'genres': m.genres,
                 'runtime': m.runtime,
+                'poster_url': m.poster_url,
                 'user_rating': m.user_rating,
                 'in_watchlist': m.in_watchlist
             } for m in media_list.items],

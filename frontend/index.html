@@ -63,12 +63,22 @@
             </p>
 
             <!-- Watchlist Section -->
-            <section class='mb-20' v-if='watchlist.length > 0'>
+            <section class='mb-20'>
                 <h3 class='text-3xl font-black text-white mb-10 flex items-center gap-4 uppercase tracking-tighter'>
                     <span class='w-2 h-8 bg-amber-500 rounded-full'></span>
                     Your Watchlist
                 </h3>
-                <div class='grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8'>
+                
+                <div class='grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8 min-h-[200px]'>
+                    <!-- Watchlist Loading Skeletons -->
+                    <template v-if="loadingWatchlist && watchlist.length === 0">
+                        <div v-for="i in 6" :key="i" class="bg-slate-800/30 rounded-[2rem] border border-white/5 animate-pulse overflow-hidden">
+                            <div class="aspect-[2/3] skeleton"></div>
+                            <div class="p-4"><div class="h-3 w-3/4 skeleton rounded mx-auto"></div></div>
+                        </div>
+                    </template>
+
+                    <!-- Actual Watchlist Items -->
                     <div v-for='item in watchlist' :key='item.id' class='bg-slate-800/40 rounded-[2rem] border border-white/5 overflow-hidden flex flex-col group relative shadow-2xl hover:border-amber-500/30 transition-all'>
                         <div class='relative aspect-[2/3]'>
                             <img v-if='item.poster_url && item.poster_url !== "N/A"' :src='item.poster_url' class='w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity' />
@@ -77,7 +87,6 @@
                             </div>
                             <div class='absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent'></div>
                             
-                            <!-- Remove Button -->
                             <button @click='toggleWatchlist(item.id)' class='absolute top-3 right-3 bg-slate-900/80 backdrop-blur-md p-2 rounded-xl text-amber-500 opacity-0 group-hover:opacity-100 hover:scale-110 transition-all border border-white/10 shadow-xl'>
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
@@ -95,6 +104,10 @@
                             <p class='text-xs font-black text-white truncate px-2 uppercase tracking-wide'>{{ item.title }}</p>
                         </div>
                     </div>
+                </div>
+                
+                <div v-if="!loadingWatchlist && watchlist.length === 0" class="p-12 text-center border-2 border-dashed border-white/5 rounded-[3rem]">
+                    <p class="text-slate-500 font-bold uppercase tracking-widest text-sm italic">Watchlist is currently empty</p>
                 </div>
             </section>
 
@@ -210,7 +223,16 @@
                             <table class='w-full text-left'>
                                 <tbody class='divide-y divide-white/5'>
                                     <tr v-for='item in media' :key='item.id' class='hover:bg-indigo-500/5 transition-colors group'>
-                                        <td class='px-12 py-10'><p class='font-black text-white text-xl tracking-tight'>{{ item.title }}</p><p class='text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mt-1'>{{ item.media_type }}</p></td>
+                                        <td class='px-12 py-10'>
+                                            <div class='flex items-center gap-6'>
+                                                <img v-if='item.poster_url && item.poster_url !== "N/A"' :src='item.poster_url' class='w-12 h-16 object-cover rounded-lg shadow-lg border border-white/5 group-hover:scale-110 transition-transform' />
+                                                <div v-else class='w-12 h-16 bg-slate-800 rounded-lg border border-white/5 flex items-center justify-center text-[8px] font-black text-slate-600 text-center uppercase p-1'>{{ item.title }}</div>
+                                                <div>
+                                                    <p class='font-black text-white text-xl tracking-tight'>{{ item.title }}</p>
+                                                    <p class='text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mt-1'>{{ item.media_type }}</p>
+                                                </div>
+                                            </div>
+                                        </td>
                                         <td class='px-12 py-10'><p class='text-xs font-bold text-slate-300'>{{ item.genres || '...' }}</p><p class='text-[10px] font-black text-slate-600 mt-2 uppercase tracking-widest'>{{ item.release_date || 'Unknown' }}</p></td>
                                         <td class='px-12 py-10 text-center'><span v-if='item.rating && item.rating !== "N/A"' class='bg-amber-500/10 text-amber-500 border border-amber-500/20 px-4 py-2 rounded-xl text-xs font-black shadow-lg shadow-amber-500/5'>{{ item.rating }}</span><span v-else class='text-slate-700 font-black opacity-20'>--</span></td>
                                         <td class='px-12 py-10 text-right'><div class='flex justify-end items-center gap-8'><div class='flex gap-3'>
@@ -329,7 +351,7 @@
 
                 onMounted(async () => { try { const res = await fetch('http://localhost:5000/api/health'); health.value = await res.json(); await fetchMedia(); await fetchPeopleStats(); await fetchGenreStats(); await fetchSuggestions(); await fetchWatchlist(); } catch (e) {} });
 
-                return { health, media, totalMedia, people, genres, suggestions, refreshingSuggestions, activeFilters, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal, fetchSuggestions, toggleFilter, isFilterActive, clearFilters, watchlist, toggleWatchlist, addToWatchlist, rateSearchResult }
+                return { health, media, totalMedia, people, genres, suggestions, refreshingSuggestions, loadingWatchlist, activeFilters, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal, fetchSuggestions, toggleFilter, isFilterActive, clearFilters, watchlist, toggleWatchlist, addToWatchlist, rateSearchResult }
             }
         }).mount('#app')
     </script>
