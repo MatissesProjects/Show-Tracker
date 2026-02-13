@@ -115,6 +115,67 @@
                 </div>
             </section>
 
+            <!-- Deep Discovery Intelligence Section -->
+            <section class='mb-20'>
+                <div class='flex justify-between items-end mb-10'>
+                    <div class='flex flex-col gap-2'>
+                        <h3 class='text-3xl font-black text-white uppercase tracking-tighter flex items-center gap-4'>
+                            <span class='w-2 h-8 bg-indigo-500 rounded-full animate-pulse'></span>
+                            Deep Discovery Intelligence
+                        </h3>
+                        <p class='text-slate-500 text-xs font-bold uppercase tracking-widest'>AI-Synthesized Hidden Gems Based on Your Total Library DNA</p>
+                    </div>
+                    <button @click='runDeepDiscovery' :disabled='discovering' class='bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-4 rounded-2xl font-black transition-all disabled:opacity-50 flex items-center gap-3 shadow-lg shadow-indigo-500/20'>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" :class="discovering ? 'animate-spin' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        {{ discovering ? 'SYNTHESIZING...' : 'RUN DEEP DISCOVERY' }}
+                    </button>
+                </div>
+
+                <div v-if="deepDiscoveries.length > 0" class='grid grid-cols-1 md:grid-cols-3 gap-10 animate-in fade-in slide-in-from-bottom-8 duration-1000'>
+                    <div v-for='d in deepDiscoveries' :key='d.title' @click="openModal(d)" class='glass rounded-[3rem] overflow-hidden border border-white/5 flex flex-col group relative hover:border-indigo-500/30 transition-all shadow-2xl cursor-pointer'>
+                        <div class='relative aspect-[16/9] overflow-hidden'>
+                            <img v-if='d.poster' :src='d.poster' @error="handleImageError(d)" class='w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-all duration-700 group-hover:scale-110' />
+                            <div class='absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent'></div>
+                            <div class='absolute bottom-6 left-6 right-6'>
+                                <div class='flex justify-between items-end'>
+                                    <div>
+                                        <p class='text-indigo-400 font-black text-[10px] uppercase tracking-widest mb-1'>{{ d.genre.split(',')[0] }}</p>
+                                        <h4 class='text-white text-xl font-black leading-tight'>{{ d.title }}</h4>
+                                    </div>
+                                    <div class='bg-indigo-600 text-white text-xs font-black px-3 py-1.5 rounded-xl border border-white/20 shadow-2xl'>{{ Math.round(d.match.total_score) }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class='p-8 flex-1 flex flex-col'>
+                            <div class='mt-auto flex gap-3 pt-6 border-t border-white/5'>
+                                <button @click='addToWatchlist(d.title)' class='flex-1 bg-white/5 hover:bg-white/10 text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all'>Add to Watchlist</button>
+                                <a :href="getTrailerUrl(d.title)" target="_blank" class='bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white p-3 rounded-xl transition-all'>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div v-else-if="!discovering" class="p-20 text-center border-2 border-dashed border-white/5 rounded-[4rem] bg-white/[0.01]">
+                    <div class="bg-indigo-600/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border border-indigo-500/20">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                    </div>
+                    <p class="text-slate-400 font-black uppercase tracking-[0.2em] text-sm">No Deep Discovery Intelligence Synced</p>
+                    <p class="text-slate-600 text-xs mt-2 font-bold">Run synthesis to generate hidden gems from your library DNA</p>
+                </div>
+
+                <div v-else class="grid grid-cols-1 md:grid-cols-3 gap-10">
+                    <div v-for="i in 3" :key="i" class="h-80 glass rounded-[3rem] animate-pulse overflow-hidden">
+                        <div class="h-1/2 skeleton"></div>
+                        <div class="p-8 space-y-4">
+                            <div class="h-4 w-1/2 skeleton rounded"></div>
+                            <div class="h-8 w-full skeleton rounded-xl"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- Recommendations Carousel -->
             <section class='mb-20' v-if="suggestions.length > 0 || refreshingSuggestions">
                 <div class='flex justify-between items-end mb-8 px-2'>
@@ -259,7 +320,6 @@
                 <!-- Sidebar -->
                 <div class='space-y-16'>
                     <section class='glass rounded-[3rem] p-12 shadow-2xl border border-white/5'>
-                        <h3 class='text-2xl font-black mb-10 text-white uppercase tracking-tighter'>Talent Core</h3>
                         <div class='space-y-8'>
                             <div v-for='p in people.slice(0, 10)' :key='p.name + p.role' @click="toggleFilter('Person', p.name)" :class="isFilterActive('Person', p.name) ? 'bg-indigo-600/20 border-indigo-500/50' : 'hover:bg-white/5 border-transparent'" class='flex justify-between items-center p-4 -m-4 rounded-[1.5rem] transition-all cursor-pointer border'>
                                 <div><p class='font-black text-white text-lg tracking-tight'>{{ p.name }}</p><p class='text-[9px] uppercase tracking-[0.3em] text-slate-600 font-black mt-1'>{{ p.role }}</p></div><div class='bg-indigo-500/10 px-4 py-2 rounded-2xl text-[10px] font-black text-indigo-400'>{{ p.count }}</div>
@@ -361,9 +421,48 @@
                 const searchResult = ref(null); const searchError = ref('');
                 const suggestionScroll = ref(null);
                 const selectedSuggestion = ref(null);
+                const deepDiscoveries = ref([]);
+                const discovering = ref(false);
 
-                const openModal = (suggestion) => { selectedSuggestion.value = suggestion; };
+                const openModal = (suggestion) => { 
+                    selectedSuggestion.value = suggestion;
+                };
                 const closeModal = () => { selectedSuggestion.value = null; };
+
+                const runDeepDiscovery = async () => {
+                    discovering.value = true;
+                    try {
+                        const res = await fetch('http://localhost:5000/api/ai/deep-discovery');
+                        deepDiscoveries.value = await res.json();
+                    } catch (e) {} finally { discovering.value = false; }
+                };
+
+                const sendChatMessage = async () => {
+                    if (!chatQuery.value) return;
+                    const text = chatQuery.value;
+                    chatHistory.value.push({ role: 'user', text });
+                    chatQuery.value = '';
+                    chatLoading.value = true;
+                    try {
+                        const res = await fetch('http://localhost:5000/api/chat', {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ query: text })
+                        });
+                        const data = await res.json();
+                        chatHistory.value.push({ role: 'assistant', text: data.response });
+                    } catch (e) {
+                        chatHistory.value.push({ role: 'assistant', text: "I'm offline right now." });
+                    } finally { chatLoading.value = false; }
+                };
+
+                const fetchAiInsight = async (mediaId) => {
+                    aiInsight.value = '';
+                    try {
+                        const res = await fetch(`http://localhost:5000/api/media/${mediaId}/ai-insight`);
+                        const data = await res.json();
+                        aiInsight.value = data.insight;
+                    } catch (e) { aiInsight.value = "Could not reach analyst."; }
+                };
 
                 const refreshedItems = new Set();
                 const handleImageError = (item) => {
@@ -559,10 +658,11 @@
                         const res = await fetch('http://localhost:5000/api/health');
                         health.value = await res.json();
                         fetchMedia(); fetchPeopleStats(); fetchGenreStats(); fetchWatchlist(); fetchSuggestions();
+                        runDeepDiscovery();
                     } catch (e) {}
                 });
 
-                return { health, media, totalMedia, people, genres, suggestions, refreshingSuggestions, loadingWatchlist, activeFilters, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal, fetchSuggestions, toggleFilter, isFilterActive, clearFilters, watchlist, toggleWatchlist, addToWatchlist, rateSearchResult, selectedSuggestion, openModal, closeModal, openWatchlistModal, getTrailerUrl, handleImageError, refreshMedia, rateExternalFromModal, addToWatchlistFromModal, createBackup }
+                return { health, media, totalMedia, people, genres, suggestions, refreshingSuggestions, loadingWatchlist, activeFilters, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal, fetchSuggestions, toggleFilter, isFilterActive, clearFilters, watchlist, toggleWatchlist, addToWatchlist, rateSearchResult, selectedSuggestion, openModal, closeModal, openWatchlistModal, getTrailerUrl, handleImageError, refreshMedia, rateExternalFromModal, addToWatchlistFromModal, createBackup, deepDiscoveries, discovering, runDeepDiscovery }
             }
         }).mount('#app')
     </script>

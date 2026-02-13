@@ -146,6 +146,75 @@ def create_app():
         db.session.commit()
         return jsonify({'message': 'Rating updated'}), 200
 
+    @app.route('/api/ai/deep-discovery', methods=['GET'])
+    def deep_discovery():
+        from models import Media
+        from utils.recommender import get_user_taste_profile
+        from utils.ai_analyst import AIAnalyst
+        from utils.omdb import OMDBClient
+        from utils.recommender import calculate_match_score
+        import json
+        
+        profile = get_user_taste_profile()
+        analyst = AIAnalyst()
+        client = OMDBClient()
+        
+        context = {
+            'loved': [m.title for m in profile['loved_media']],
+            'liked': [m.title for m in profile['liked_media']],
+            'talent': list(profile['people'].keys())[:10],
+            'genres': list(profile['genres'].keys())[:5]
+        }
+        
+        prompt = f"""
+        [USER TASTE DNA]
+        Loved: {', '.join(context['loved'][:10])}
+        Liked: {', '.join(context['liked'][:10])}
+        Top Genres: {', '.join(context['genres'])}
+        
+        [TASK]
+        Suggest exactly 3 'Hidden Gem' movies or shows that bridge these tastes. 
+        Focus on: Smart Comedy, Hard Sci-Fi, or Cynical Characters.
+        Output ONLY a JSON array of titles. No explanation.
+        Example: ["Title 1", "Title 2", "Title 3"]
+        """
+        
+        titles = []
+        try:
+            response = analyst.chat_with_library(prompt, [])
+            import re
+            match = re.search(r'\[\s*".*"\s*\]', response, re.DOTALL)
+            if match:
+                titles = json.loads(match.group())
+            else:
+                # Fallback extraction if model rambles
+                titles = re.findall(r'"([^"]*)"', response)[:3]
+        except: pass
+        
+        if not titles:
+            titles = ["Devs", "Better Off Ted", "Lapsis"]
+            
+        results = []
+        for title in titles[:3]:
+            data = client.search_by_title(title)
+            if data:
+                score_data = calculate_match_score(data, profile)
+                
+                # Align with suggestion structure for the modal
+                results.append({
+                    'id': None, # External item
+                    'title': data.get('Title'),
+                    'year': data.get('Year'),
+                    'genre': data.get('Genre'),
+                    'poster': data.get('Poster'),
+                    'summary': data.get('Plot'),
+                    'match': score_data,
+                    'on_netflix': False,
+                    'youtube_url': f"https://www.youtube.com/results?search_query={data.get('Title').replace(' ', '+')}+official+trailer"
+                })
+        
+        return jsonify(results), 200
+
     @app.route('/api/media/<int:media_id>/details', methods=['GET'])
     def get_media_details(media_id):
         from models import Media
@@ -239,9 +308,9 @@ def create_app():
         
         data = request.json
         title = data.get('title')
-        rating = data.get('rating') # can be 1, -1, or 0
+        rating = data.get('rating') # can be 2, 1, -1, or 0
         
-        if not title or rating not in [1, -1, 0]:
+        if not title or rating not in [2, 1, -1, 0]:
             return jsonify({'error': 'Invalid data'}), 400
             
         media = Media.query.filter_by(title=title).first()
