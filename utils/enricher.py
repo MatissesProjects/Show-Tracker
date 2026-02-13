@@ -5,17 +5,24 @@ from utils.title_cleaner import clean_netflix_title
 
 def enrich_media_data(db_instance):
     """
-    Finds unique 'unknown' media, cleans their titles, 
-    and fetches data from OMDb.
+    Finds unique 'unknown' media or media missing rich data, 
+    cleans their titles, and fetches data from OMDb.
     """
     client = OMDBClient()
     
-    # Get all unique unknown media
-    unknown_media = db_instance.session.query(Media).filter_by(media_type='unknown').all()
+    # Get media that is 'unknown' OR missing genre/rating data
+    from sqlalchemy import or_
+    to_enrich = db_instance.session.query(Media).filter(
+        or_(
+            Media.media_type == 'unknown',
+            Media.genres == None,
+            Media.rating == None
+        )
+    ).all()
     
     # Group by cleaned title first to minimize API calls
     title_groups = {}
-    for media in unknown_media:
+    for media in to_enrich:
         base_title = clean_netflix_title(media.title)
         if base_title not in title_groups:
             title_groups[base_title] = []
