@@ -49,6 +49,17 @@ def create_app():
             return jsonify({'message': f'Successfully enriched {count} unique titles'}), 200
         except Exception as e:
             return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/media', methods=['GET'])
+    def get_media():
+        from models import Media
+        media_list = Media.query.order_by(Media.id.desc()).limit(100).all()
+        return jsonify([{
+            'id': m.id,
+            'title': m.title,
+            'media_type': m.media_type,
+            'release_date': m.release_date
+        } for m in media_list])
         
     return app
 
