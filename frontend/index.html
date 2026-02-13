@@ -70,6 +70,10 @@
                         Suggested For You
                     </h3>
                     <div class='flex gap-2'>
+                        <button @click='fetchSuggestions' :disabled='refreshingSuggestions' class='mr-4 p-2 px-4 rounded-xl bg-indigo-50 text-indigo-600 font-bold text-sm hover:bg-indigo-100 transition-colors flex items-center gap-2'>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" :class="refreshingSuggestions ? 'animate-spin' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                            Refresh
+                        </button>
                         <button @click="scrollSuggestions(-1)" class="p-2 rounded-full bg-white shadow-sm border hover:bg-slate-50 transition-colors">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
                         </button>
@@ -84,6 +88,12 @@
                             <img v-if='s.poster' :src='s.poster' class='w-full h-full object-cover transition-transform duration-700 group-hover:scale-110' />
                             <div class='absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent'></div>
                             
+                            <!-- Netflix Tag -->
+                            <div v-if='s.on_netflix' class='absolute top-4 left-4 bg-red-600 text-white text-[10px] font-black px-2 py-1 rounded-md shadow-lg flex items-center gap-1'>
+                                <span class='w-1.5 h-1.5 rounded-full bg-white animate-pulse'></span>
+                                ON NETFLIX
+                            </div>
+
                             <!-- Floating Controls -->
                             <div class='absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300'>
                                 <button @click='rateExternal(s.title, 1)' class='bg-white/90 p-3 rounded-full text-green-600 shadow-lg hover:scale-110 transition-transform'>
@@ -267,6 +277,7 @@
                 const people = ref([])
                 const genres = ref([])
                 const suggestions = ref([])
+                const refreshingSuggestions = ref(false)
                 const currentPage = ref(1)
                 const totalPages = ref(1)
                 
@@ -281,11 +292,13 @@
                 const suggestionScroll = ref(null)
 
                 const fetchSuggestions = async () => {
+                    refreshingSuggestions.value = true
                     try {
                         const res = await fetch('http://localhost:5000/api/suggestions')
                         const data = await res.json()
                         suggestions.value = Array.isArray(data) ? data : []
                     } catch (e) { console.error('Failed suggestions', e) }
+                    finally { refreshingSuggestions.value = false }
                 }
 
                 const scrollSuggestions = (direction) => {
@@ -302,11 +315,13 @@
                             body: JSON.stringify({ title, rating })
                         })
                         if (res.ok) {
-                            // Find the suggestion and remove it or update its status
                             suggestions.value = suggestions.value.filter(s => s.title !== title)
                             await fetchMedia()
                             await fetchPeopleStats()
-                            await fetchSuggestions()
+                            // If we run low on suggestions, fetch more
+                            if (suggestions.value.length < 3) {
+                                await fetchSuggestions()
+                            }
                         }
                     } catch (e) { console.error('Rate external failed', e) }
                 }
@@ -430,7 +445,7 @@
                     } catch (e) { console.error('API Error', e) }
                 })
 
-                return { health, media, totalMedia, people, genres, suggestions, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal }
+                return { health, media, totalMedia, people, genres, suggestions, refreshingSuggestions, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal, fetchSuggestions }
             }
         }).mount('#app')
     </script>
