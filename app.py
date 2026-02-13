@@ -62,27 +62,43 @@ def create_app():
     def get_media():
         from models import Media
         from sqlalchemy import func
+        from flask import request
+        
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+
         # Group by title to show unique shows/movies
         subquery = db.session.query(
             func.max(Media.id).label('max_id')
         ).group_by(Media.title).subquery()
         
+        # Base query for unique media
+        base_query = Media.query.filter(Media.id.in_(subquery))
+        
+        # Total count for pagination metadata
+        total = base_query.count()
+
         # Order by unrated first (descending so True comes before False), then by most recently added
-        media_list = Media.query.filter(Media.id.in_(subquery)).order_by(
+        media_list = base_query.order_by(
             (Media.user_rating == 0).desc(), 
             Media.id.desc()
-        ).limit(100).all()
+        ).paginate(page=page, per_page=per_page, error_out=False)
         
-        return jsonify([{
-            'id': m.id,
-            'title': m.title,
-            'media_type': m.media_type,
-            'release_date': m.release_date,
-            'rating': m.rating,
-            'genres': m.genres,
-            'runtime': m.runtime,
-            'user_rating': m.user_rating
-        } for m in media_list])
+        return jsonify({
+            'items': [{
+                'id': m.id,
+                'title': m.title,
+                'media_type': m.media_type,
+                'release_date': m.release_date,
+                'rating': m.rating,
+                'genres': m.genres,
+                'runtime': m.runtime,
+                'user_rating': m.user_rating
+            } for m in media_list.items],
+            'total': total,
+            'page': page,
+            'pages': media_list.pages
+        })
 
     @app.route('/api/stats/people', methods=['GET'])
     def get_people_stats():
