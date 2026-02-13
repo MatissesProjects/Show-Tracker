@@ -72,10 +72,9 @@ def create_app():
             func.max(Media.id).label('max_id')
         ).group_by(Media.title).subquery()
         
-        # Base query for unique media
-        base_query = Media.query.filter(Media.id.in_(subquery))
+        # Library should only show media that is NOT in the watchlist
+        base_query = Media.query.filter(Media.id.in_(subquery), Media.in_watchlist == False)
         
-        # Total count for pagination metadata
         total = base_query.count()
 
         # Order by unrated first (descending so True comes before False), then by most recently added
@@ -112,13 +111,21 @@ def create_app():
 
     @app.route('/api/media/<int:media_id>/rate', methods=['POST'])
     def rate_media(media_id):
-        # ... (previous rate logic) ...
         from flask import request
-        from models import Media
+        from models import Media, WatchHistory
         rating = request.json.get('rating')
         media = Media.query.get(media_id)
         if not media: return jsonify({'error': 'Media not found'}), 404
+        
         media.user_rating = rating
+        # Rating an item implies it has been watched, so remove from watchlist
+        media.in_watchlist = False
+        
+        # Add to history if not already there
+        if not WatchHistory.query.filter_by(media_id=media.id).first():
+            history = WatchHistory(media_id=media.id, platform='Manual')
+            db.session.add(history)
+            
         db.session.commit()
         return jsonify({'message': 'Rating updated'}), 200
 
@@ -138,14 +145,13 @@ def create_app():
         return jsonify([{
             'id': m.id,
             'title': m.title,
-            'media_type': m.media_type,
-            'poster': m.tmdb_id # We'll repurpose this for now if needed, or handle in frontend
+            'media_type': m.media_type
         } for m in items]), 200
 
     @app.route('/api/media/rate-external', methods=['POST'])
     def rate_external_media():
         from flask import request
-        from models import Media
+        from models import Media, WatchHistory
         from utils.omdb import OMDBClient
         from utils.enricher import apply_metadata
         
@@ -162,25 +168,26 @@ def create_app():
             db.session.add(media)
             db.session.flush()
             
-            # Enrich immediately so the rating has context
             client = OMDBClient()
             omdb_data = client.search_by_title(title)
             if omdb_data:
                 apply_metadata(media, omdb_data, db)
         
         media.user_rating = rating
-        # If rating from external suggestions, we implicitly add to watchlist if it's a 0 or 1
-        if rating >= 0:
+        
+        if rating == 0:
+            # Neutral rating from discovery means "Add to Watchlist"
             media.in_watchlist = True
-            
-        # Add to watch history if specifically thumbed up/down (indicating it was watched)
-        if rating in [1, -1]:
-            from models import WatchHistory
-            history = WatchHistory(media_id=media.id, platform='Discovered')
-            db.session.add(history)
+        else:
+            # Thumbs up/down means "I watched this", so ensure it's not in watchlist
+            media.in_watchlist = False
+            # Add to watch history
+            if not WatchHistory.query.filter_by(media_id=media.id).first():
+                history = WatchHistory(media_id=media.id, platform='Discovered')
+                db.session.add(history)
             
         db.session.commit()
-        return jsonify({'message': 'External media saved to library/watchlist'}), 200
+        return jsonify({'message': 'Media processed successfully'}), 200
 
     @app.route('/api/stats/genres', methods=['GET'])
     def get_genre_stats_api():
