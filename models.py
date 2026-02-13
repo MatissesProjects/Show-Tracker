@@ -28,6 +28,22 @@ class Media(db.Model):
     # Relationship via association object
     person_memberships = db.relationship("MediaPerson", back_populates="media", cascade="all, delete-orphan")
 
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'media_type': self.media_type,
+            'release_date': self.release_date,
+            'rating': self.rating,
+            'genres': self.genres,
+            'runtime': self.runtime,
+            'total_seasons': self.total_seasons,
+            'poster_url': self.poster_url,
+            'user_rating': self.user_rating,
+            'in_watchlist': self.in_watchlist or False,
+            'overview': self.overview
+        }
+
 class Person(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     tmdb_id = db.Column(db.Integer, unique=True, nullable=True, index=True)

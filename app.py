@@ -99,19 +99,7 @@ def create_app():
         ).paginate(page=page, per_page=per_page, error_out=False)
         
         return jsonify({
-            'items': [{
-                'id': m.id,
-                'title': m.title,
-                'media_type': m.media_type,
-                'release_date': m.release_date,
-                'rating': m.rating,
-                'genres': m.genres,
-                'runtime': m.runtime,
-                'total_seasons': m.total_seasons,
-                'poster_url': m.poster_url,
-                'user_rating': m.user_rating,
-                'in_watchlist': m.in_watchlist or False
-            } for m in media_list.items],
+            'items': [m.to_dict() for m in media_list.items],
             'total': media_list.total,
             'page': page,
             'pages': media_list.pages
@@ -131,7 +119,7 @@ def create_app():
         from flask import request
         from models import Media, WatchHistory
         rating = request.json.get('rating')
-        media = Media.query.get(media_id)
+        media = db.session.get(Media, media_id)
         if not media: return jsonify({'error': 'Media not found'}), 404
         
         media.user_rating = rating
@@ -166,6 +154,9 @@ def create_app():
         analyst = AIAnalyst()
         client = OMDBClient()
         
+        # Get every title currently in the database to ensure we don't suggest them
+        all_tracked_titles = [m.title for m in Media.query.all()]
+        
         context = {
             'loved': [m.title for m in profile['loved_media']],
             'liked': [m.title for m in profile['liked_media']],
@@ -179,11 +170,14 @@ def create_app():
         Liked: {', '.join(context['liked'][:10])}
         Top Genres: {', '.join(context['genres'])}
         
+        [EXCLUDE THESE TITLES - USER HAS ALREADY WATCHED]
+        {', '.join(all_tracked_titles)}
+        
         [TASK]
-        Suggest exactly 3 'Hidden Gem' movies or shows that bridge these tastes. 
+        Suggest exactly 3 NEW 'Hidden Gem' movies or shows that bridge these tastes but ARE NOT in the exclude list. 
         Focus on: Smart Comedy, Hard Sci-Fi, or Cynical Characters.
         Output ONLY a JSON array of titles. No explanation.
-        Example: ["Title 1", "Title 2", "Title 3"]
+        Example: ["New Title 1", "New Title 2", "New Title 3"]
         """
         
         titles = []
@@ -227,7 +221,8 @@ def create_app():
         from models import Media
         from utils.recommender import get_user_taste_profile, calculate_match_score
         
-        m = Media.query.get_or_404(media_id)
+        m = db.session.get(Media, media_id)
+        if not m: return jsonify({'error': 'Media not found'}), 404
         profile = get_user_taste_profile()
         
         actors = ", ".join([mp.person.name for mp in m.person_memberships if mp.role == 'Actor'])
@@ -244,20 +239,17 @@ def create_app():
         
         score_data = calculate_match_score(media_data, profile)
         
-        return jsonify({
-            'id': m.id,
-            'title': m.title,
-            'media_type': m.media_type,
+        result = m.to_dict()
+        result.update({
             'year': m.release_date[:4] if m.release_date else '????',
-            'genre': m.genres,
-            'runtime': m.runtime,
-            'total_seasons': m.total_seasons,
             'poster': m.poster_url,
             'summary': m.overview or "No description available.",
             'match': score_data,
             'youtube_url': f"https://www.youtube.com/results?search_query={m.title.replace(' ', '+')}+funny+moments+clips",
             'on_netflix': False 
         })
+        
+        return jsonify(result), 200
 
     @app.route('/api/media/<int:media_id>/refresh', methods=['POST'])
     def refresh_media_data(media_id):
@@ -266,7 +258,8 @@ def create_app():
         from utils.enricher import apply_metadata
         from utils.title_cleaner import clean_netflix_title
         
-        media = Media.query.get_or_404(media_id)
+        media = db.session.get(Media, media_id)
+        if not media: return jsonify({'error': 'Media not found'}), 404
         client = OMDBClient()
         
         # Try with current title first, then cleaned title
@@ -285,7 +278,7 @@ def create_app():
     @app.route('/api/media/<int:media_id>/watchlist', methods=['POST'])
     def toggle_watchlist(media_id):
         from models import Media
-        media = Media.query.get(media_id)
+        media = db.session.get(Media, media_id)
         if not media: return jsonify({'error': 'Media not found'}), 404
         media.in_watchlist = not media.in_watchlist
         db.session.commit()
@@ -295,16 +288,7 @@ def create_app():
     def get_watchlist():
         from models import Media
         items = Media.query.filter_by(in_watchlist=True).all()
-        return jsonify([{
-            'id': m.id,
-            'title': m.title,
-            'media_type': m.media_type,
-            'genres': m.genres,
-            'rating': m.rating,
-            'runtime': m.runtime,
-            'total_seasons': m.total_seasons,
-            'poster_url': m.poster_url
-        } for m in items]), 200
+        return jsonify([m.to_dict() for m in items]), 200
 
     @app.route('/api/media/rate-external', methods=['POST'])
     def rate_external_media():
