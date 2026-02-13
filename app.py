@@ -72,12 +72,11 @@ def create_app():
             func.max(Media.id).label('max_id')
         ).group_by(Media.title).subquery()
         
-        # Library should only show media that is NOT in the watchlist
+        # Library should only show media that is confirmed WATCHED (not in watchlist)
         base_query = Media.query.filter(Media.id.in_(subquery), Media.in_watchlist == False)
         
         total = base_query.count()
 
-        # Order by unrated first (descending so True comes before False), then by most recently added
         media_list = base_query.order_by(
             (Media.user_rating == 0).desc(), 
             Media.id.desc()
