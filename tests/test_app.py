@@ -1,6 +1,6 @@
 import pytest
 from models import Media, Person, MediaPerson, WatchHistory
-from app import db
+from database import db
 
 def test_health_check(client):
     """Test the health check endpoint."""

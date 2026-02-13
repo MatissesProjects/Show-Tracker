@@ -1,7 +1,7 @@
 import pytest
 import io
 from models import Media, WatchHistory
-from app import db
+from database import db
 
 def test_netflix_upload(client, app):
     """Test uploading a mock Netflix CSV."""
