@@ -45,6 +45,9 @@
                     <p class='text-slate-400 mt-2 font-medium tracking-wide'>Tracking <span class='text-indigo-400'>{{ totalMedia }}</span> series and films.</p>
                 </div>
                 <div class='flex gap-4'>
+                    <button @click='createBackup' class='bg-slate-800 hover:bg-slate-700 border border-white/10 p-3 rounded-2xl transition-all text-slate-400 hover:text-white' title='Create Backup'>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                    </button>
                     <label class='bg-slate-800 hover:bg-slate-700 border border-white/10 px-6 py-3 rounded-2xl cursor-pointer transition-all flex items-center gap-3 font-bold text-slate-200 shadow-xl'>
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
                         Import History
@@ -57,8 +60,61 @@
                 </div>
             </div>
 
+            <p v-if='uploadStatus' class='mb-10 p-5 rounded-2xl border border-white/5 glass shadow-2xl' :class='uploadStatus.includes("Error") ? "text-red-400" : "text-green-400 font-bold uppercase tracking-widest text-xs"'>
+                {{ uploadStatus }}
+            </p>
+
+            <!-- Watchlist Section -->
+            <section class='mb-20' v-if="watchlist.length > 0 || loadingWatchlist">
+                <h3 class='text-3xl font-black text-white mb-10 flex items-center gap-4 uppercase tracking-tighter'>
+                    <span class='w-2 h-8 bg-amber-500 rounded-full'></span>
+                    Your Watchlist
+                </h3>
+
+                <div class='grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8 min-h-[200px]'>
+                    <!-- Watchlist Loading Skeletons -->
+                    <template v-if="loadingWatchlist && watchlist.length === 0">
+                        <div v-for="i in 6" :key="i" class="bg-slate-800/30 rounded-[2rem] border border-white/5 animate-pulse overflow-hidden">
+                            <div class="aspect-[2/3] skeleton"></div>
+                            <div class="p-4"><div class="h-3 w-3/4 skeleton rounded mx-auto"></div></div>
+                        </div>
+                    </template>
+
+                    <!-- Actual Watchlist Items -->
+                    <div v-for='item in watchlist' :key='item.id' class='bg-slate-800/40 rounded-[2rem] border border-white/5 overflow-hidden flex flex-col group relative shadow-2xl hover:border-amber-500/30 transition-all'>
+                        <div class='relative aspect-[2/3]'>
+                            <img v-if='item.poster_url && item.poster_url !== "N/A"' :src='item.poster_url' class='w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity' />
+                            <div v-else class='w-full h-full bg-slate-900 flex items-center justify-center text-slate-700 font-black text-[10px] p-4 text-center'>
+                                {{ item.title }}
+                            </div>
+                            <div class='absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent'></div>
+
+                            <button @click='toggleWatchlist(item.id)' class='absolute top-3 right-3 bg-slate-900/80 backdrop-blur-md p-2 rounded-xl text-amber-500 opacity-0 group-hover:opacity-100 hover:scale-110 transition-all border border-white/10 shadow-xl'>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+
+                            <div class='absolute bottom-4 left-4 right-4'>
+                                <div class='flex justify-between items-end'>
+                                    <p class='text-[10px] font-black text-amber-500 uppercase tracking-widest truncate mr-2'>{{ item.genres ? item.genres.split(',')[0] : 'Media' }}</p>   
+                                    <div v-if='item.rating && item.rating !== "N/A"' class='bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.5 rounded shadow-lg'>
+                                        {{ item.rating }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class='p-4 text-center'>
+                            <p class='text-xs font-black text-white truncate px-2 uppercase tracking-wide'>{{ item.title }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="!loadingWatchlist && watchlist.length === 0" class="p-12 text-center border-2 border-dashed border-white/5 rounded-[3rem]">
+                    <p class="text-slate-500 font-bold uppercase tracking-widest text-sm italic">Watchlist is currently empty</p>
+                </div>
+            </section>
+
             <!-- Recommendations Carousel -->
-            <section class='mb-20'>
+            <section class='mb-20' v-if="suggestions.length > 0 || refreshingSuggestions">
                 <div class='flex justify-between items-end mb-8 px-2'>
                     <div class='flex flex-col gap-2'>
                         <h3 class='text-3xl font-black text-white'>Suggested For You</h3>
@@ -71,7 +127,7 @@
                         </div>
                     </div>
                     <div class='flex gap-3 items-center'>
-                        <button @click='fetchSuggestions' :disabled='refreshingSuggestions' class='mr-6 p-2.5 px-5 rounded-2xl bg-slate-800 text-slate-300 font-black text-xs hover:bg-slate-700 transition-all flex items-center gap-3 border border-white/5'>
+                        <button @click='fetchSuggestions' :disabled='refreshingSuggestions' class='mr-6 p-2.5 px-5 rounded-2xl bg-slate-800 text-slate-300 font-black text-xs hover:bg-slate-700 transition-all flex items-center gap-3 border border-white/5 active:scale-95'>
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-indigo-400" :class="refreshingSuggestions ? 'animate-spin' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                             REFRESH
                         </button>
@@ -266,6 +322,15 @@
                 const openModal = (suggestion) => { selectedSuggestion.value = suggestion; };
                 const closeModal = () => { selectedSuggestion.value = null; };
 
+                const createBackup = async () => {
+                    uploadStatus.value = 'Creating backup...';
+                    try {
+                        const res = await fetch('http://localhost:5000/api/backup', { method: 'POST' });
+                        const data = await res.json();
+                        uploadStatus.value = data.message || data.error;
+                    } catch (e) { uploadStatus.value = 'Backup failed'; }
+                };
+
                 const fetchSuggestions = async () => {
                     refreshingSuggestions.value = true;
                     if (activeFilters.value.length > 0) suggestions.value = [];
@@ -275,17 +340,27 @@
                         const res = await fetch(`http://localhost:5000/api/suggestions?${params.toString()}`);
                         const data = await res.json();
                         suggestions.value = Array.isArray(data) ? data : [];
-                    } catch (e) {} finally { refreshingSuggestions.value = false }
+                    } catch (e) {
+                        suggestions.value = [];
+                    } finally { refreshingSuggestions.value = false }
                 };
 
                 const fetchWatchlist = async () => {
                     loadingWatchlist.value = true;
-                    try { const res = await fetch('http://localhost:5000/api/watchlist'); watchlist.value = await res.json(); } catch (e) {}
-                    finally { loadingWatchlist.value = false; }
+                    try { 
+                        const res = await fetch('http://localhost:5000/api/watchlist'); 
+                        const data = await res.json();
+                        watchlist.value = Array.isArray(data) ? data : [];
+                    } catch (e) {
+                        watchlist.value = [];
+                    } finally { loadingWatchlist.value = false; }
                 };
 
                 const toggleWatchlist = async (mediaId) => {
-                    try { await fetch(`http://localhost:5000/api/media/${mediaId}/watchlist`, { method: 'POST' }); fetchWatchlist(); fetchMedia(); } catch (e) {}
+                    try { 
+                        await fetch(`http://localhost:5000/api/media/${mediaId}/watchlist`, { method: 'POST' }); 
+                        Promise.all([fetchWatchlist(), fetchMedia()]); 
+                    } catch (e) {}
                 };
 
                 const addToWatchlist = async (title) => {
@@ -294,7 +369,11 @@
                             method: 'POST', headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ title, rating: 0 }) 
                         });
-                        if (res.ok) { fetchWatchlist(); fetchMedia(); suggestions.value = suggestions.value.filter(s => s.title !== title); if (searchResult.value && searchResult.value.title === title) await searchNewMedia(); }
+                        if (res.ok) { 
+                            suggestions.value = suggestions.value.filter(s => s.title !== title); 
+                            if (searchResult.value && searchResult.value.title === title) await searchNewMedia();
+                            Promise.all([fetchWatchlist(), fetchMedia()]); 
+                        }
                     } catch (e) {}
                 };
 
@@ -340,7 +419,7 @@
                             body: JSON.stringify({ title, rating })
                         });
                         suggestions.value = suggestions.value.filter(s => s.title !== title);
-                        fetchMedia(); fetchPeopleStats(); fetchWatchlist(); fetchSuggestions();
+                        Promise.all([fetchMedia(), fetchPeopleStats(), fetchWatchlist(), fetchSuggestions()]);
                     } catch (e) {}
                 };
 
@@ -352,19 +431,32 @@
                     } catch (e) {} finally { searching.value = false }
                 };
 
-                const fetchGenreStats = async () => { try { const res = await fetch('http://localhost:5000/api/stats/genres'); genres.value = await res.json(); } catch (e) {} };
-                const fetchPeopleStats = async () => { try { const res = await fetch('http://localhost:5000/api/stats/people'); people.value = await res.json(); } catch (e) {} };
+                const fetchGenreStats = async () => { try { const res = await fetch('http://localhost:5000/api/stats/genres'); const data = await res.json(); genres.value = Array.isArray(data) ? data : []; } catch (e) { genres.value = []; } };
+                const fetchPeopleStats = async () => { try { const res = await fetch('http://localhost:5000/api/stats/people'); const data = await res.json(); people.value = Array.isArray(data) ? data : []; } catch (e) { people.value = []; } };
                 const fetchMedia = async () => { try { const res = await fetch(`http://localhost:5000/api/media?page=${currentPage.value}&per_page=15`); const data = await res.json(); media.value = data.items; totalPages.value = data.pages; totalMedia.value = data.total; } catch (e) {} };
                 const changePage = async (page) => { if (page >= 1 && page <= totalPages.value) { currentPage.value = page; await fetchMedia(); } };
                 const visiblePages = computed(() => { const pages = []; let start = Math.max(1, currentPage.value - 2); let end = Math.min(totalPages.value, start + 4); if (end - start < 4) start = Math.max(1, end - 4); for (let i = start; i <= end; i++) if (i > 0) pages.push(i); return pages; });
 
                 const rateMedia = async (mediaId, rating) => {
-                    try { await fetch(`http://localhost:5000/api/media/${mediaId}/rate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rating }) }); await fetchMedia(); await fetchPeopleStats(); await fetchSuggestions(); await fetchWatchlist(); } catch (e) {}
+                    try { 
+                        // Optimistic Update: Remove from current view immediately for instant "move"
+                        const idx = media.value.findIndex(m => m.id === mediaId);
+                        if (idx !== -1) media.value.splice(idx, 1);
+                        
+                        await fetch(`http://localhost:5000/api/media/${mediaId}/rate`, { 
+                            method: 'POST', 
+                            headers: { 'Content-Type': 'application/json' }, 
+                            body: JSON.stringify({ rating }) 
+                        });
+                        
+                        // Fire refreshes in parallel to fill the gap and update stats
+                        Promise.all([fetchMedia(), fetchPeopleStats(), fetchWatchlist(), fetchSuggestions()]);
+                    } catch (e) { fetchMedia(); }
                 };
 
                 const handleFileUpload = async (event) => { selectedFile.value = event.target.files[0]; if (selectedFile.value) await uploadFile(); };
                 const uploadFile = async () => { uploading.value = true; uploadStatus.value = 'Analyzing...'; const formData = new FormData(); formData.append('file', selectedFile.value); try { const res = await fetch('http://localhost:5000/api/upload-netflix', { method: 'POST', body: formData }); const result = await res.json(); uploadStatus.value = result.message; await fetchMedia(); } catch (e) {} finally { uploading.value = false } };
-                const enrichData = async () => { enriching.value = true; uploadStatus.value = 'Enriching...'; try { const res = await fetch('http://localhost:5000/api/enrich', { method: 'POST' }); const result = await res.json(); uploadStatus.value = result.message; await fetchMedia(); await fetchPeopleStats(); await fetchGenreStats(); await fetchSuggestions(); await fetchWatchlist(); } catch (e) {} finally { enriching.value = false } };
+                const enrichData = async () => { enriching.value = true; uploadStatus.value = 'Enriching...'; try { const res = await fetch('http://localhost:5000/api/enrich', { method: 'POST' }); const result = await res.json(); uploadStatus.value = result.message; await fetchMedia(); await fetchPeopleStats(); await fetchGenreStats(); await fetchWatchlist(); await fetchSuggestions();} catch (e) {} finally { enriching.value = false } };
 
                 onMounted(async () => {
                     try {
@@ -374,7 +466,7 @@
                     } catch (e) {}
                 });
 
-                return { health, media, totalMedia, people, genres, suggestions, refreshingSuggestions, loadingWatchlist, activeFilters, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal, fetchSuggestions, toggleFilter, isFilterActive, clearFilters, watchlist, toggleWatchlist, addToWatchlist, rateSearchResult, selectedSuggestion, openModal, closeModal, rateExternalFromModal, addToWatchlistFromModal }
+                return { health, media, totalMedia, people, genres, suggestions, refreshingSuggestions, loadingWatchlist, activeFilters, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal, fetchSuggestions, toggleFilter, isFilterActive, clearFilters, watchlist, toggleWatchlist, addToWatchlist, rateSearchResult, selectedSuggestion, openModal, closeModal, rateExternalFromModal, addToWatchlistFromModal, createBackup }
             }
         }).mount('#app')
     </script>

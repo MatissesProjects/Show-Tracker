@@ -2,8 +2,8 @@ from database import db
 
 class MediaPerson(db.Model):
     __tablename__ = 'media_person'
-    media_id = db.Column(db.Integer, db.ForeignKey('media.id'), primary_key=True)
-    person_id = db.Column(db.Integer, db.ForeignKey('person.id'), primary_key=True)
+    media_id = db.Column(db.Integer, db.ForeignKey('media.id'), primary_key=True, index=True)
+    person_id = db.Column(db.Integer, db.ForeignKey('person.id'), primary_key=True, index=True)
     role = db.Column(db.String(50), primary_key=True) # 'Actor', 'Director', 'Creator'
     
     # Relationships to the association object
@@ -12,8 +12,8 @@ class MediaPerson(db.Model):
 
 class Media(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    tmdb_id = db.Column(db.Integer, unique=True, nullable=True)
-    title = db.Column(db.String(200), nullable=False)
+    tmdb_id = db.Column(db.Integer, unique=True, nullable=True, index=True)
+    title = db.Column(db.String(200), nullable=False, index=True)
     media_type = db.Column(db.String(50)) # 'movie' or 'tv'
     release_date = db.Column(db.String(20))
     overview = db.Column(db.Text)
@@ -21,16 +21,16 @@ class Media(db.Model):
     rating = db.Column(db.String(10))
     runtime = db.Column(db.String(50))
     poster_url = db.Column(db.String(500))
-    user_rating = db.Column(db.Integer, default=0) # 1 for thumbs up, -1 for thumbs down, 0 for neutral
-    in_watchlist = db.Column(db.Boolean, default=False)
+    user_rating = db.Column(db.Integer, default=0, index=True) # 1 for thumbs up, -1 for thumbs down, 0 for neutral
+    in_watchlist = db.Column(db.Boolean, default=False, index=True)
     
     # Relationship via association object
     person_memberships = db.relationship("MediaPerson", back_populates="media", cascade="all, delete-orphan")
 
 class Person(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    tmdb_id = db.Column(db.Integer, unique=True, nullable=True)
-    name = db.Column(db.String(200), nullable=False)
+    tmdb_id = db.Column(db.Integer, unique=True, nullable=True, index=True)
+    name = db.Column(db.String(200), nullable=False, index=True)
     profile_path = db.Column(db.String(200))
     
     # Relationship via association object
@@ -38,8 +38,8 @@ class Person(db.Model):
 
 class WatchHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    media_id = db.Column(db.Integer, db.ForeignKey('media.id'), nullable=False)
-    watch_date = db.Column(db.DateTime, server_default=db.func.now())
+    media_id = db.Column(db.Integer, db.ForeignKey('media.id'), nullable=False, index=True)
+    watch_date = db.Column(db.DateTime, server_default=db.func.now(), index=True)
     platform = db.Column(db.String(50))
     netflix_sentiment = db.Column(db.String(20)) # 'liked', 'disliked', etc.
     

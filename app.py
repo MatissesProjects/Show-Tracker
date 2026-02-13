@@ -16,6 +16,10 @@ def create_app():
     db.init_app(app)
     
     with app.app_context():
+        # Backup before any potential schema changes
+        from utils.backup import backup_database
+        backup_database()
+        
         # Import models here to ensure they are registered before create_all
         import models
         db.create_all()
@@ -27,6 +31,14 @@ def create_app():
         app.logger.error(traceback.format_exc())
         return jsonify({"error": "Internal Server Error", "details": str(e)}), 500
 
+    @app.route('/api/backup', methods=['POST'])
+    def manual_backup():
+        from utils.backup import backup_database
+        path = backup_database()
+        if path:
+            return jsonify({'message': f'Backup created at {path}'}), 200
+        return jsonify({'error': 'Backup failed'}), 500
+
     @app.route('/api/health')
     def health_check():
         return {'status': 'healthy', 'message': 'Show Tracker API is running'}
@@ -35,6 +47,9 @@ def create_app():
     def upload_netflix():
         from flask import request
         from utils.parser import parse_netflix_history
+        from utils.backup import backup_database
+        
+        backup_database() # Safety first
         
         if 'file' not in request.files:
             return jsonify({'error': 'No file part'}), 400
@@ -52,6 +67,8 @@ def create_app():
     @app.route('/api/enrich', methods=['POST'])
     def enrich_data():
         from utils.enricher import enrich_media_data
+        from utils.backup import backup_database
+        backup_database()
         try:
             count = enrich_media_data(db)
             return jsonify({'message': f'Successfully enriched {count} unique titles'}), 200
@@ -61,23 +78,22 @@ def create_app():
     @app.route('/api/media', methods=['GET'])
     def get_media():
         from models import Media
-        from sqlalchemy import func
+        from sqlalchemy import func, or_
         from flask import request
         
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 20, type=int)
 
-        # Group by title to show unique shows/movies
-        subquery = db.session.query(
-            func.max(Media.id).label('max_id')
-        ).group_by(Media.title).subquery()
+        # Optimization: Use a simpler query and let paginate handle the count
+        # Filter for items NOT in watchlist
+        query = Media.query.filter(
+            or_(Media.in_watchlist == False, Media.in_watchlist == None)
+        )
         
-        # Library should only show media that is confirmed WATCHED (not in watchlist)
-        base_query = Media.query.filter(Media.id.in_(subquery), Media.in_watchlist == False)
-        
-        total = base_query.count()
-
-        media_list = base_query.order_by(
+        # Deduplicate by title if needed, or just order by rating and ID
+        # Since we deduplicate in the parser/enricher, we can usually just query Media
+        # But to be safe against OMDb title normalization duplicates:
+        media_list = query.order_by(
             (Media.user_rating == 0).desc(), 
             Media.id.desc()
         ).paginate(page=page, per_page=per_page, error_out=False)
@@ -93,9 +109,9 @@ def create_app():
                 'runtime': m.runtime,
                 'poster_url': m.poster_url,
                 'user_rating': m.user_rating,
-                'in_watchlist': m.in_watchlist
+                'in_watchlist': m.in_watchlist or False
             } for m in media_list.items],
-            'total': total,
+            'total': media_list.total,
             'page': page,
             'pages': media_list.pages
         })
