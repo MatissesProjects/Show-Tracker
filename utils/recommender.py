@@ -1,7 +1,7 @@
 import requests
 import random
 from utils.analyzer import get_top_people, get_genre_stats
-from models import Media, MediaPerson, Person
+from models import Media, MediaPerson, Person, WatchHistory
 from database import db
 
 def get_user_taste_profile():
