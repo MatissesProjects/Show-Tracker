@@ -21,7 +21,12 @@ def clean_netflix_title(title):
         r'[:\-]\s+Volume.*',
         r'[:\-]\s+Limited Series.*',
         r'[:\-]\s+Chapter.*',
-        r'[:\-]\s+Series.*'
+        r'[:\-]\s+Series.*',
+        r'[:\-]\s+The Series.*',
+        r'[:\-]\s+Indigo League.*',
+        r'[:\-]\s+Ruby and Sapphire.*',
+        r'[:\-]\s+XY.*',
+        r'\s+The Series.*' # Handle cases like "Pokémon The Series"
     ]
     
     cleaned = title

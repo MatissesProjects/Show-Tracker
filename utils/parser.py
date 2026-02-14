@@ -9,7 +9,13 @@ def parse_netflix_history(csv_file_content, db):
     Parses Netflix 'ViewingActivity.csv'. 
     Netflix format: Title, Date
     """
-    stream = io.StringIO(csv_file_content.decode('utf-8'))
+    # Try decoding with utf-8-sig (handles BOM) first, then fallback to latin-1
+    try:
+        decoded_content = csv_file_content.decode('utf-8-sig')
+    except UnicodeDecodeError:
+        decoded_content = csv_file_content.decode('latin-1')
+
+    stream = io.StringIO(decoded_content)
     reader = csv.DictReader(stream)
     
     new_entries = 0
