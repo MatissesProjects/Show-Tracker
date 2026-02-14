@@ -10,6 +10,7 @@ from utils.title_cleaner import clean_netflix_title
 from utils.recommender import get_user_taste_profile, calculate_match_score
 from utils.ai_analyst import AIAnalyst
 from sqlalchemy import or_
+import json
 
 media_bp = Blueprint('media', __name__)
 
