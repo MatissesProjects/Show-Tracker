@@ -52,6 +52,12 @@ def rate_media(media_id):
         db.session.add(history)
         
     db.session.commit()
+    
+    # Invalidate taste profile cache
+    from utils.cache import APICache
+    db.session.query(APICache).filter_by(cache_key="user_taste_dna_v1").delete()
+    db.session.commit()
+    
     return jsonify({'message': 'Rating updated'}), 200
 
 @media_bp.route('/api/media/<int:media_id>/watchlist', methods=['POST'])
@@ -98,33 +104,34 @@ def rate_external_media():
             db.session.add(history)
         
     db.session.commit()
+    
+    # Invalidate taste profile cache
+    from utils.cache import APICache
+    db.session.query(APICache).filter_by(cache_key="user_taste_dna_v1").delete()
+    db.session.commit()
+    
     return jsonify({'message': 'Media processed successfully'}), 200
 
 @media_bp.route('/api/media/<int:media_id>/details', methods=['GET'])
 def get_media_details(media_id):
     m = db.session.get(Media, media_id)
     if not m: return jsonify({'error': 'Media not found'}), 404
-    profile = get_user_taste_profile()
-    
-    actors = ", ".join([mp.person.name for mp in m.person_memberships if mp.role == 'Actor'])
-    director = ", ".join([mp.person.name for mp in m.person_memberships if mp.role == 'Director'])
-    
-    media_data = {
-        'Actors': actors,
-        'Director': director,
-        'Genre': m.genres,
-        'imdbRating': m.rating
-    }
-    
-    score_data = calculate_match_score(media_data, profile)
     
     # Generate/Retrieve AI Insight & Thematic DNA
     ai_insight = m.ai_insight
     thematic_dna = m.thematic_metadata
     
+    # We only call the AI if something is missing
     if not ai_insight or not thematic_dna:
         analyst = AIAnalyst()
         if analyst.check_availability():
+            # Get profile only if we actually need to generate an insight
+            profile = get_user_taste_profile()
+            
+            actors = ", ".join([mp.person.name for mp in m.person_memberships if mp.role == 'Actor'])
+            director = ", ".join([mp.person.name for mp in m.person_memberships if mp.role == 'Director'])
+            media_data = {'Actors': actors, 'Director': director, 'Genre': m.genres, 'imdbRating': m.rating}
+
             if not ai_insight:
                 ai_insight = analyst.generate_insight(m.title, media_data, profile)
                 m.ai_insight = ai_insight
@@ -139,8 +146,14 @@ def get_media_details(media_id):
                 db.session.commit()
             except Exception as e:
                 db.session.rollback()
-                # Log but don't fail the request - we can try again next time
                 print(f"Non-critical commit error in details route: {e}")
+
+    # Now calculate match score (this is fast if profile is cached)
+    profile = get_user_taste_profile()
+    actors = ", ".join([mp.person.name for mp in m.person_memberships if mp.role == 'Actor'])
+    director = ", ".join([mp.person.name for mp in m.person_memberships if mp.role == 'Director'])
+    media_data = {'Actors': actors, 'Director': director, 'Genre': m.genres, 'imdbRating': m.rating}
+    score_data = calculate_match_score(media_data, profile)
 
     result = m.to_dict()
     result.update({
@@ -150,7 +163,7 @@ def get_media_details(media_id):
         'match': score_data,
         'ai_insight': ai_insight,
         'thematic_dna': json.loads(thematic_dna) if thematic_dna else None,
-        'youtube_url': f"https://www.youtube.com/results?search_query={m.title.replace(' ', '+')}+funny+moments+clips",
+        'youtube_url': f"https://www.youtube.com/results?search_query={m.title.replace(' ', '+')}+official+trailer",
         'on_netflix': False 
     })
     

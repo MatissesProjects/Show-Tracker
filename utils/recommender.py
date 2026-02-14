@@ -3,8 +3,16 @@ import random
 from models import Media, MediaPerson, Person, WatchHistory
 from database import db
 
-def get_user_taste_profile():
+def get_user_taste_profile(refresh=False):
     """Aggregates the user's preferences with weighted importance for rated items."""
+    cache_key = "user_taste_dna_v1"
+    if not refresh:
+        cached = get_cached_response(cache_key, expiry_days=0.5) # 12 hour cache
+        if cached:
+            # Convert lists back to sets/objects if necessary, 
+            # though here we mainly return dicts of scores.
+            return cached
+
     # Fetch all watched media to calculate refined weights
     watched_media = Media.query.join(WatchHistory).distinct().all()
     
@@ -35,18 +43,16 @@ def get_user_taste_profile():
         if media.thematic_metadata:
             try:
                 dna = json.loads(media.thematic_metadata)
-                for t in dna.get('themes', []):
-                    theme_scores[t] = theme_scores.get(t, 0) + weight
-                for m in dna.get('mood', []):
-                    mood_scores[m] = mood_scores.get(m, 0) + weight
-                for a in dna.get('aesthetic', []):
-                    aesthetic_scores[a] = aesthetic_scores.get(a, 0) + weight
+                for key in ['themes', 'mood', 'aesthetic', 'tropes']:
+                    target_key = 'moods' if key == 'mood' else ('aesthetics' if key == 'aesthetic' else key)
+                    for val in dna.get(key, []):
+                        stats = theme_scores if target_key == 'themes' else (mood_scores if target_key == 'moods' else aesthetic_scores)
+                        # Tropes are handled as themes for scoring
+                        if target_key == 'tropes': stats = theme_scores
+                        stats[val] = stats.get(val, 0) + weight
             except: pass
 
     # Tiered weight identification for explicit matching
-    loved_media = [m for m in watched_media if m.user_rating == 2]
-    liked_media = [m for m in watched_media if m.user_rating == 1]
-    
     loved_people_ids = [p[0] for p in db.session.query(MediaPerson.person_id).join(Media).filter(Media.user_rating == 2).distinct().all()]
     liked_people_ids = [p[0] for p in db.session.query(MediaPerson.person_id).join(Media).filter(Media.user_rating == 1).distinct().all()]
     disliked_people_ids = [p[0] for p in db.session.query(MediaPerson.person_id).join(Media).filter(Media.user_rating == -1).distinct().all()]
@@ -57,7 +63,7 @@ def get_user_taste_profile():
     else:
         genre_weights = {}
         
-    return {
+    result = {
         'people': people_scores,
         'genres': genre_weights,
         'themes': theme_scores,
@@ -65,10 +71,11 @@ def get_user_taste_profile():
         'aesthetics': aesthetic_scores,
         'loved_people_ids': loved_people_ids,
         'liked_people_ids': liked_people_ids,
-        'disliked_people_ids': disliked_people_ids,
-        'loved_media': loved_media,
-        'liked_media': liked_media
+        'disliked_people_ids': disliked_people_ids
     }
+    
+    set_cached_response(cache_key, result)
+    return result
 
 def calculate_match_score(media_data, profile):
     """Enhanced scoring with tiered weights and Creator/Director awareness."""
