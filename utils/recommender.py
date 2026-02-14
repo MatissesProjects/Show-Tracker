@@ -54,7 +54,7 @@ def calculate_match_score(media_data, profile):
         else:
             talent_pool.extend([p.split(' (')[0].strip() for p in actors.split(', ') if p])
     
-    # Add Creators
+    # Add Creators/Directors
     talent_pool.extend([p.strip() for p in director.split(',') if p])
     talent_pool.extend([p.strip() for p in writer.split(',') if p])
 
@@ -62,40 +62,50 @@ def calculate_match_score(media_data, profile):
         person_obj = Person.query.filter_by(name=person_name).first()
         if person_obj:
             if person_obj.id in profile['disliked_people_ids']:
-                score -= 60
-                details.append(f"Avoid: {person_name} (Disliked) (-60)")
+                score -= 100 # Heavily penalize dislikes
+                details.append(f"Avoid: {person_name} (Disliked) (-100)")
                 continue
             
             if person_obj.id in profile['loved_people_ids']:
-                score += 80
-                details.append(f"Starring/Created by {person_name} (LOVED) (+80)")
+                score += 120 # Massive boost for loved creators/actors
+                details.append(f"Starring/Created by {person_name} (LOVED) (+120)")
             elif person_obj.id in profile['liked_people_ids']:
-                score += 40
-                details.append(f"Starring/Created by {person_name} (Liked) (+40)")
+                score += 50
+                details.append(f"Starring/Created by {person_name} (Liked) (+50)")
 
         if person_name in profile['people']:
             count = profile['people'][person_name]
-            points = 25 if count > 5 else 12
+            points = 30 if count > 5 else 15
             score += points
             details.append(f"Frequent Talent: {person_name} (+{points})")
+
+    # Genre Affinity
     genre_match_count = 0
     for genre in genres_list:
         if genre in profile['genres']:
-            score += round(profile['genres'][genre], 1)
+            weight = profile['genres'][genre]
+            score += round(weight, 1)
             genre_match_count += 1
+            if weight > 30: # Top tier genre
+                score += 10 # Bonus for high-affinity genre
+    
     if genre_match_count > 0:
         details.append(f"Matched {genre_match_count} Preferred Genres")
+
+    # Quality Signal
     try:
         r_val = float(rating)
-        if r_val > 8.0:
-            score += 15
-            details.append(f"Highly Rated ({r_val}) (+15)")
-        elif r_val > 7.0:
-            score += 10
-            details.append(f"Well Rated ({r_val}) (+10)")
-        else:
-            score += r_val
+        if r_val > 8.5:
+            score += 40 # Masterpiece boost
+            details.append(f"Top-Tier Rating ({r_val}) (+40)")
+        elif r_val > 7.5:
+            score += 20
+            details.append(f"Solid Rating ({r_val}) (+20)")
+        elif r_val < 5.0 and r_val > 0:
+            score -= 30
+            details.append(f"Poorly Rated ({r_val}) (-30)")
     except: pass
+    
     return {'total_score': round(score, 1), 'breakdown': details}
 
 from utils.cache import get_cached_response, set_cached_response
@@ -103,11 +113,11 @@ import time
 
 def get_proactive_suggestions(db_instance, limit=20, target_people=None, target_genres=None, refresh=False):
     # Generate a key based on params
-    params_key = f"suggestions_{target_people}_{target_genres}"
+    params_key = f"suggestions_v2_{target_people}_{target_genres}"
     
-    # Return cache if less than 1 hour old, UNLESS refresh is requested
+    # Return cache if less than 2 hours old, UNLESS refresh is requested
     if not refresh:
-        cached = get_cached_response(params_key, expiry_days=0.04) # ~1 hour
+        cached = get_cached_response(params_key, expiry_days=0.08) # ~2 hours
         if cached:
             return cached
 
@@ -118,28 +128,85 @@ def get_proactive_suggestions(db_instance, limit=20, target_people=None, target_
     # Use a session for faster repeated requests
     session = requests.Session()
     
+    # Strategy A: Direct Filtering (User Requested)
     if target_people or target_genres:
-        # 1. Fetch filtered results
         for p in (target_people or []): 
             suggestions.extend(fetch_by_person(p, profile, seen_titles, limit, session))
         for g in (target_genres or []): 
             suggestions.extend(fetch_by_genre(g, profile, seen_titles, limit, session))
             
-        # 2. If we have few results, supplement with general intelligence
-        if len(suggestions) < 5:
-            supplemental = get_general_intelligence_suggestions(db_instance, profile, seen_titles, limit // 2, session)
-            suggestions.extend(supplemental)
-    else:
-        suggestions = get_general_intelligence_suggestions(db_instance, profile, seen_titles, limit, session)
+    # Strategy B: AI-Powered Thematic Brainstorming (NEW)
+    # This finds titles that aren't just direct actor/genre matches but share "Vibe DNA"
+    ai_candidates = get_ai_thematic_candidates(profile, seen_titles)
+    for title in ai_candidates:
+        data = fetch_by_title_tvmaze(title, profile, seen_titles, session)
+        if data:
+            data['match']['total_score'] += 30 # AI Recommendation Boost
+            data['match']['breakdown'].insert(0, "Thematic AI Discovery (+30)")
+            suggestions.append(data)
+
+    # Strategy C: Top Talent & DNA Similarity (Existing)
+    if len(suggestions) < limit:
+        supplemental = get_general_intelligence_suggestions(db_instance, profile, seen_titles, limit, session)
+        suggestions.extend(supplemental)
 
     unique_suggestions = {s['title']: s for s in suggestions if s.get('poster')}.values()
-    high_quality = [s for s in unique_suggestions if s['match']['total_score'] > 20]
-    result = sorted(high_quality if high_quality else unique_suggestions, key=lambda x: x['match']['total_score'], reverse=True)[:limit]
+    
+    # Refined Scoring: Penalize obvious/over-suggested items, reward high match depth
+    result = sorted(unique_suggestions, key=lambda x: x['match']['total_score'], reverse=True)[:limit]
     
     # Store in cache
     set_cached_response(params_key, result)
     
     return result
+
+def get_ai_thematic_candidates(profile, seen_titles):
+    """Uses the AI Analyst to brainstorm 10 high-potential titles based on deep taste DNA."""
+    from utils.ai_analyst import AIAnalyst
+    analyst = AIAnalyst()
+    if not analyst.check_availability():
+        return []
+
+    loved = [m.title for m in profile['loved_media']][:10]
+    genres = list(profile['genres'].keys())[:5]
+    
+    prompt = f"""
+    [TASTE PROFILE]
+    Loved Shows/Movies: {', '.join(loved)}
+    Preferred Genres: {', '.join(genres)}
+    
+    [TASK]
+    Brainstorm 10 'Thematic Siblings'—media that shares the same tone, writing style, or philosophical themes as the loved list. 
+    Exclude these already watched titles: {', '.join(list(seen_titles)[:20])}
+    
+    Output ONLY a JSON list of titles. No commentary.
+    Example: ["Title 1", "Title 2"]
+    """
+    
+    try:
+        import re, json
+        response = analyst.chat_with_library(prompt, [])
+        match = re.search(r'\[\s*".*"\s*\]', response, re.DOTALL)
+        if match:
+            return json.loads(match.group())
+        return re.findall(r'"([^"]*)"', response)
+    except:
+        return []
+
+def fetch_by_title_tvmaze(title, profile, seen_titles, session=None):
+    """Specific fetcher for a single title."""
+    if session is None: session = requests.Session()
+    try:
+        res = session.get(f"https://api.tvmaze.com/singlesearch/shows?q={requests.utils.quote(title)}", timeout=5)
+        if res.ok:
+            show = res.json()
+            title_low = show['name'].lower()
+            if title_low not in seen_titles:
+                score_data = calculate_match_score(show, profile)
+                seen_titles.add(title_low)
+                return format_suggestion(show, score_data)
+    except: pass
+    return None
 
 def get_general_intelligence_suggestions(db_instance, profile, seen_titles, limit, session=None):
     """Fallback/General strategy using user DNA."""
