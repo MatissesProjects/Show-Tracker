@@ -303,6 +303,16 @@
                                         <td class='px-12 py-10'><div class='flex items-center gap-6'><img v-if='item.poster_url && item.poster_url !== "N/A"' :src='item.poster_url' @error="handleImageError(item)" class='w-12 h-16 object-cover rounded-lg shadow-lg border border-white/5' /><div v-else class='w-12 h-16 bg-slate-800 rounded-lg border border-white/5 flex items-center justify-center text-[8px] font-black text-slate-600 text-center uppercase p-1'>{{ item.title }}</div><div><p class='font-black text-white text-xl tracking-tight'>{{ item.title }}</p><p class='text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mt-1'>{{ item.media_type }}</p></div></div></td>
                                         <td class='px-12 py-10'>
                                             <p class='text-xs font-bold text-slate-300'>{{ item.genres || '...' }}</p>
+                                            <div v-if="item.thematic_metadata" class="flex flex-wrap gap-1.5 mt-3">
+                                                <template v-if="JSON.parse(item.thematic_metadata)">
+                                                    <span v-for="tag in (JSON.parse(item.thematic_metadata).themes || []).slice(0, 2)" :key="tag" class="text-[8px] font-black bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded-md uppercase tracking-tighter border border-indigo-500/20">
+                                                        {{ tag }}
+                                                    </span>
+                                                    <span v-for="tag in (JSON.parse(item.thematic_metadata).tropes || []).slice(0, 1)" :key="tag" class="text-[8px] font-black bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-md uppercase tracking-tighter border border-amber-500/20">
+                                                        {{ tag }}
+                                                    </span>
+                                                </template>
+                                            </div>
                                             <p class='text-[10px] font-black text-slate-600 mt-2 uppercase tracking-widest'>
                                                 {{ item.release_date || 'Unknown' }}
                                                 <span v-if="item.runtime && item.runtime !== 'N/A'"> • {{ item.runtime }}</span>

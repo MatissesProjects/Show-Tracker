@@ -44,7 +44,8 @@ class Media(db.Model):
             'user_rating': self.user_rating,
             'in_watchlist': self.in_watchlist or False,
             'overview': self.overview,
-            'ai_insight': self.ai_insight
+            'ai_insight': self.ai_insight,
+            'thematic_metadata': self.thematic_metadata
         }
 
 class Person(db.Model):
