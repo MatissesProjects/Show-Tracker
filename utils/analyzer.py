@@ -95,8 +95,9 @@ def get_thematic_stats():
     result = {}
     for key in stats:
         sorted_items = sorted(stats[key].items(), key=lambda x: x[1], reverse=True)
-        # For talent, we only want those with significant presence
+        # Lower thresholds to show more granular data
         limit = 15 if key != 'talent' else 20
-        result[key] = [{'name': item[0], 'count': round(item[1], 1)} for item in sorted_items if item[1] > (0.3 if key != 'talent' else 0.5)][:limit]
+        # Show items with at least one "weighted" appearance (0.2)
+        result[key] = [{'name': item[0], 'count': round(item[1], 1)} for item in sorted_items if item[1] >= 0.2][:limit]
         
     return result
