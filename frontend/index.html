@@ -473,8 +473,7 @@
         createApp({
             setup() {
                 const health = ref(null); const media = ref([]); const totalMedia = ref(0);
-                const people = ref([]); const genres = ref([]); const suggestions = ref([]);
-                const thematicStats = ref({ themes: [], moods: [], aesthetics: [] });
+                const thematicStats = ref({ talent: [], genres: [], themes: [], moods: [], aesthetics: [], tropes: [] });
                 const watchlist = ref([]); const refreshingSuggestions = ref(false);
                 const loadingWatchlist = ref(false); const activeFilters = ref([]);
                 const currentPage = ref(1); const totalPages = ref(1);
