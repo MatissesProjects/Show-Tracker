@@ -343,11 +343,10 @@
                                 <h4 class='text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4 flex items-center gap-2'>
                                     <span class='w-4 h-[1px] bg-slate-800'></span> Top Talent
                                 </h4>
-                                <div class='grid grid-cols-1 gap-2'>
-                                    <div v-for='p in thematicStats.talent.slice(0, 6)' :key='p.name' @click="toggleFilter('Person', p.name)" :class="isFilterActive('Person', p.name) ? 'bg-indigo-600 border-indigo-500' : 'bg-white/5 border-transparent hover:bg-white/10'" class='flex justify-between items-center px-4 py-2 rounded-xl transition-all cursor-pointer border group'>
-                                        <p class='font-bold text-xs text-white truncate mr-4'>{{ p.name }}</p>
-                                        <div class='bg-white/10 px-2 py-0.5 rounded-lg text-[8px] font-black text-slate-400 group-hover:text-white'>{{ p.count }}</div>
-                                    </div>
+                                <div class='flex flex-wrap gap-2'>
+                                    <button v-for='p in thematicStats.talent.slice(0, 15)' :key='p.name' @click="toggleFilter('Person', p.name)" :class="isFilterActive('Person', p.name) ? 'bg-indigo-600 text-white border-indigo-500 scale-105 shadow-lg shadow-indigo-500/20' : 'bg-white/5 text-slate-400 hover:bg-white/10 border-white/5'" class='border px-3 py-1.5 rounded-xl transition-all text-[10px] font-black uppercase tracking-wider'>
+                                        {{ p.name }}
+                                    </button>
                                 </div>
                             </div>
 

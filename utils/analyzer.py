@@ -96,7 +96,7 @@ def get_thematic_stats():
     for key in stats:
         sorted_items = sorted(stats[key].items(), key=lambda x: x[1], reverse=True)
         # For talent, we only want those with significant presence
-        limit = 15 if key != 'talent' else 10
+        limit = 15 if key != 'talent' else 20
         result[key] = [{'name': item[0], 'count': round(item[1], 1)} for item in sorted_items if item[1] > (0.3 if key != 'talent' else 0.5)][:limit]
         
     return result
