@@ -23,6 +23,51 @@ class AIAnalyst:
         except:
             return False
 
+    def extract_thematic_dna(self, media_title, media_data, refresh=False):
+        """Extracts themes, mood, and aesthetic from media plot."""
+        cache_key = f"ai_dna_{media_title.lower().replace(' ', '_')}"
+        if not refresh:
+            cached = get_cached_response(cache_key, expiry_days=30)
+            if cached:
+                return cached
+
+        prompt = f"""
+        Analyze the Media DNA:
+        Title: {media_title}
+        Genre: {media_data.get('Genre')}
+        Plot: {media_data.get('Plot') or media_data.get('summary')}
+        
+        Task: Identify the core 'DNA' components.
+        - Themes: 3-5 specific narrative themes (e.g., 'Unreliable Narrator', 'Corporate Greed').
+        - Mood: 2-3 emotive descriptors (e.g., 'Bleak', 'Witty', 'Suspenseful').
+        - Aesthetic: 1-2 visual/stylistic descriptors (e.g., 'Neon Noir', 'Minimalist', 'Gritty').
+        
+        Output ONLY a JSON object:
+        {{"themes": [], "mood": [], "aesthetic": []}}
+        """
+
+        try:
+            response = requests.post(
+                self.generate_url,
+                json={{
+                    "model": self.model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "format": "json"
+                }},
+                timeout=120
+            )
+            if response.status_code == 200:
+                result = response.json().get('response', '').strip()
+                try:
+                    dna = json.loads(result)
+                    set_cached_response(cache_key, dna)
+                    return dna
+                except: pass
+            return None
+        except Exception:
+            return None
+
     def generate_insight(self, media_title, media_data, user_profile, refresh=False):
         """Generates a personalized reasoning for why the user would like a specific media."""
         

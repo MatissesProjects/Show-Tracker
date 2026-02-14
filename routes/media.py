@@ -117,13 +117,23 @@ def get_media_details(media_id):
     
     score_data = calculate_match_score(media_data, profile)
     
-    # Generate/Retrieve AI Insight
+    # Generate/Retrieve AI Insight & Thematic DNA
     ai_insight = m.ai_insight
-    if not ai_insight:
+    thematic_dna = m.thematic_metadata
+    
+    if not ai_insight or not thematic_dna:
         analyst = AIAnalyst()
         if analyst.check_availability():
-            ai_insight = analyst.generate_insight(m.title, media_data, profile)
-            m.ai_insight = ai_insight
+            if not ai_insight:
+                ai_insight = analyst.generate_insight(m.title, media_data, profile)
+                m.ai_insight = ai_insight
+            
+            if not thematic_dna:
+                dna_obj = analyst.extract_thematic_dna(m.title, media_data)
+                if dna_obj:
+                    m.thematic_metadata = json.dumps(dna_obj)
+                    thematic_dna = m.thematic_metadata
+            
             db.session.commit()
 
     result = m.to_dict()
@@ -133,6 +143,7 @@ def get_media_details(media_id):
         'summary': m.overview or "No description available.",
         'match': score_data,
         'ai_insight': ai_insight,
+        'thematic_dna': json.loads(thematic_dna) if thematic_dna else None,
         'youtube_url': f"https://www.youtube.com/results?search_query={m.title.replace(' ', '+')}+funny+moments+clips",
         'on_netflix': False 
     })

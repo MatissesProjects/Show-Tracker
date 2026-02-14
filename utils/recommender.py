@@ -11,25 +11,38 @@ def get_user_taste_profile():
     
     people_scores = {}
     genre_scores = {}
+    theme_scores = {}
+    mood_scores = {}
+    aesthetic_scores = {}
     
+    import json
     for media in watched_media:
         # Weight: 1.0 for Loved (2), 0.7 for Liked (1), 0.2 for Unrated (0)
-        # We ignore Disliked (-1) here as they are handled by explicit ID filters later
         weight = 0.2
         if media.user_rating == 2: weight = 1.0
         elif media.user_rating == 1: weight = 0.7
-        elif media.user_rating == -1: continue # Don't count talent/genres from disliked stuff
+        elif media.user_rating == -1: continue 
         
-        # Accumulate Talent Scores
+        # Talent & Genres (existing)
         for mp in media.person_memberships:
             name = mp.person.name
             people_scores[name] = people_scores.get(name, 0) + weight
-            
-        # Accumulate Genre Scores
         if media.genres:
             genres = media.genres.split(', ')
             for g in genres:
                 genre_scores[g] = genre_scores.get(g, 0) + weight
+                
+        # Thematic DNA (New)
+        if media.thematic_metadata:
+            try:
+                dna = json.loads(media.thematic_metadata)
+                for t in dna.get('themes', []):
+                    theme_scores[t] = theme_scores.get(t, 0) + weight
+                for m in dna.get('mood', []):
+                    mood_scores[m] = mood_scores.get(m, 0) + weight
+                for a in dna.get('aesthetic', []):
+                    aesthetic_scores[a] = aesthetic_scores.get(a, 0) + weight
+            except: pass
 
     # Tiered weight identification for explicit matching
     loved_media = [m for m in watched_media if m.user_rating == 2]
@@ -48,6 +61,9 @@ def get_user_taste_profile():
     return {
         'people': people_scores,
         'genres': genre_weights,
+        'themes': theme_scores,
+        'moods': mood_scores,
+        'aesthetics': aesthetic_scores,
         'loved_people_ids': loved_people_ids,
         'liked_people_ids': liked_people_ids,
         'disliked_people_ids': disliked_people_ids,
@@ -118,6 +134,34 @@ def calculate_match_score(media_data, profile):
     
     if genre_match_count > 0:
         details.append(f"Matched {genre_match_count} Preferred Genres")
+
+    # Thematic DNA Matching (New)
+    # Since we can't extract DNA for every suggestion instantly without killing API,
+    # we use a "DNA Similarity" strategy if the suggestion already has DNA cached.
+    # If not, the "Thematic AI Discovery" strategy in get_proactive_suggestions handles it.
+    
+    # Check if this item has cached DNA (via APICache or it's a known Media item)
+    cache_key = f"ai_dna_{media_data.get('Title', '').lower().replace(' ', '_')}"
+    cached_dna = get_cached_response(cache_key)
+    if cached_dna:
+        dna_score = 0
+        matches = []
+        for t in cached_dna.get('themes', []):
+            if t in profile['themes']:
+                dna_score += 15
+                matches.append(t)
+        for m in cached_dna.get('mood', []):
+            if m in profile['moods']:
+                dna_score += 10
+                matches.append(m)
+        for a in cached_dna.get('aesthetic', []):
+            if a in profile['aesthetics']:
+                dna_score += 10
+                matches.append(a)
+        
+        if dna_score > 0:
+            score += dna_score
+            details.append(f"DNA Match: {', '.join(matches[:3])} (+{dna_score})")
 
     # Quality Signal
     try:

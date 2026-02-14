@@ -25,6 +25,7 @@ class Media(db.Model):
     user_rating = db.Column(db.Integer, default=0, index=True) # 2: Love, 1: Like, -1: Dislike, 0: Neutral
     in_watchlist = db.Column(db.Boolean, default=False, index=True)
     ai_insight = db.Column(db.Text)
+    thematic_metadata = db.Column(db.Text) # Stores JSON: {themes: [], mood: [], aesthetic: ""}
     
     # Relationship via association object
     person_memberships = db.relationship("MediaPerson", back_populates="media", cascade="all, delete-orphan")
