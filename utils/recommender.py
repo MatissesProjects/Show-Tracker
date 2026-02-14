@@ -5,27 +5,48 @@ from models import Media, MediaPerson, Person
 from database import db
 
 def get_user_taste_profile():
-    """Aggregates the user's preferences into a high-fidelity weight map."""
-    top_people = get_top_people(limit=100)
-    genre_stats = get_genre_stats()
+    """Aggregates the user's preferences with weighted importance for rated items."""
+    # Fetch all watched media to calculate refined weights
+    watched_media = Media.query.join(WatchHistory).distinct().all()
     
-    # Tiered weight identification
-    loved_media = Media.query.filter(Media.user_rating == 2).all()
-    liked_media = Media.query.filter(Media.user_rating == 1).all()
+    people_scores = {}
+    genre_scores = {}
+    
+    for media in watched_media:
+        # Weight: 1.0 for Loved (2), 0.7 for Liked (1), 0.2 for Unrated (0)
+        # We ignore Disliked (-1) here as they are handled by explicit ID filters later
+        weight = 0.2
+        if media.user_rating == 2: weight = 1.0
+        elif media.user_rating == 1: weight = 0.7
+        elif media.user_rating == -1: continue # Don't count talent/genres from disliked stuff
+        
+        # Accumulate Talent Scores
+        for mp in media.person_memberships:
+            name = mp.person.name
+            people_scores[name] = people_scores.get(name, 0) + weight
+            
+        # Accumulate Genre Scores
+        if media.genres:
+            genres = media.genres.split(', ')
+            for g in genres:
+                genre_scores[g] = genre_scores.get(g, 0) + weight
+
+    # Tiered weight identification for explicit matching
+    loved_media = [m for m in watched_media if m.user_rating == 2]
+    liked_media = [m for m in watched_media if m.user_rating == 1]
     
     loved_people_ids = [p[0] for p in db.session.query(MediaPerson.person_id).join(Media).filter(Media.user_rating == 2).distinct().all()]
     liked_people_ids = [p[0] for p in db.session.query(MediaPerson.person_id).join(Media).filter(Media.user_rating == 1).distinct().all()]
     disliked_people_ids = [p[0] for p in db.session.query(MediaPerson.person_id).join(Media).filter(Media.user_rating == -1).distinct().all()]
 
-    people_weights = {p['name']: p['count'] for p in top_people}
-    if genre_stats:
-        max_genre_count = max(g['count'] for g in genre_stats)
-        genre_weights = {g['name']: (g['count'] / max_genre_count) * 40 for g in genre_stats}
+    if genre_scores:
+        max_genre_score = max(genre_scores.values())
+        genre_weights = {name: (score / max_genre_score) * 40 for name, score in genre_scores.items()}
     else:
         genre_weights = {}
         
     return {
-        'people': people_weights,
+        'people': people_scores,
         'genres': genre_weights,
         'loved_people_ids': loved_people_ids,
         'liked_people_ids': liked_people_ids,
@@ -74,10 +95,16 @@ def calculate_match_score(media_data, profile):
                 details.append(f"Starring/Created by {person_name} (Liked) (+50)")
 
         if person_name in profile['people']:
-            count = profile['people'][person_name]
-            points = 30 if count > 5 else 15
+            weighted_count = profile['people'][person_name]
+            # Higher reward for talent you've explicitly rated/liked multiple times
+            if weighted_count > 3:
+                points = 40
+            elif weighted_count > 1:
+                points = 20
+            else:
+                points = 10
             score += points
-            details.append(f"Frequent Talent: {person_name} (+{points})")
+            details.append(f"Frequent Talent: {person_name} (Weighted: {round(weighted_count, 1)}) (+{points})")
 
     # Genre Affinity
     genre_match_count = 0
