@@ -53,6 +53,9 @@ def get_user_taste_profile(refresh=False):
             except: pass
 
     # Tiered weight identification for explicit matching
+    loved_titles = [m.title for m in watched_media if m.user_rating == 2]
+    liked_titles = [m.title for m in watched_media if m.user_rating == 1]
+    
     loved_people_ids = [p[0] for p in db.session.query(MediaPerson.person_id).join(Media).filter(Media.user_rating == 2).distinct().all()]
     liked_people_ids = [p[0] for p in db.session.query(MediaPerson.person_id).join(Media).filter(Media.user_rating == 1).distinct().all()]
     disliked_people_ids = [p[0] for p in db.session.query(MediaPerson.person_id).join(Media).filter(Media.user_rating == -1).distinct().all()]
@@ -69,6 +72,8 @@ def get_user_taste_profile(refresh=False):
         'themes': theme_scores,
         'moods': mood_scores,
         'aesthetics': aesthetic_scores,
+        'loved_titles': loved_titles,
+        'liked_titles': liked_titles,
         'loved_people_ids': loved_people_ids,
         'liked_people_ids': liked_people_ids,
         'disliked_people_ids': disliked_people_ids

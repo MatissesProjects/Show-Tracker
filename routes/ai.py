@@ -26,8 +26,8 @@ def deep_discovery():
     all_tracked_titles = [m.title for m in Media.query.all()]
     
     context = {
-        'loved': [m.title for m in profile['loved_media']],
-        'liked': [m.title for m in profile['liked_media']],
+        'loved': profile.get('loved_titles', []),
+        'liked': profile.get('liked_titles', []),
         'talent': list(profile['people'].keys())[:10],
         'genres': list(profile['genres'].keys())[:5]
     }
