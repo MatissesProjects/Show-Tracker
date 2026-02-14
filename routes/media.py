@@ -134,7 +134,12 @@ def get_media_details(media_id):
                     m.thematic_metadata = json.dumps(dna_obj)
                     thematic_dna = m.thematic_metadata
             
-            db.session.commit()
+            try:
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                # Log but don't fail the request - we can try again next time
+                print(f"Non-critical commit error in details route: {e}")
 
     result = m.to_dict()
     result.update({

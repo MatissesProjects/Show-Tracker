@@ -421,7 +421,7 @@
                                         <span v-if="selectedSuggestion.total_seasons && selectedSuggestion.total_seasons !== 'N/A'"> • {{ selectedSuggestion.total_seasons }} SEASONS</span>
                                     </p>
                                 </div>
-                                <div class="bg-indigo-600 text-white w-16 h-16 rounded-full flex items-center justify-center text-xl font-black shadow-xl border-4 border-slate-800">
+                                <div v-if="selectedSuggestion.match" class="bg-indigo-600 text-white w-16 h-16 rounded-full flex items-center justify-center text-xl font-black shadow-xl border-4 border-slate-800">
                                     {{ Math.round(selectedSuggestion.match.total_score) }}
                                 </div>
                             </div>
@@ -431,8 +431,18 @@
                                 <p class="text-slate-300 text-lg leading-relaxed font-medium italic">"{{ selectedSuggestion.summary }}"</p>
                             </div>
 
+                            <div class="mt-8" v-if="selectedSuggestion.thematic_dna">
+                                <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-3">Narrative DNA</h4>
+                                <div class="flex flex-wrap gap-2">
+                                    <span v-for="t in selectedSuggestion.thematic_dna.themes" :key="t" class="bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider">{{ t }}</span>
+                                    <span v-for="m in selectedSuggestion.thematic_dna.mood" :key="m" class="bg-blue-600/20 text-blue-400 border border-blue-500/30 px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider">{{ m }}</span>
+                                    <span v-for="a in selectedSuggestion.thematic_dna.aesthetic" :key="a" class="bg-purple-600/20 text-purple-400 border border-purple-500/30 px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider">{{ a }}</span>
+                                    <span v-for="tr in selectedSuggestion.thematic_dna.tropes" :key="tr" class="bg-amber-600/20 text-amber-400 border border-amber-500/30 px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider">{{ tr }}</span>
+                                </div>
+                            </div>
+
                             <div class="mt-10 grid grid-cols-2 gap-8">
-                                <div>
+                                <div v-if="selectedSuggestion.match">
                                     <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4 text-green-500">Why It's Good</h4>
                                     <div class="space-y-2">
                                         <div v-for="reason in selectedSuggestion.match.breakdown" :key="reason" class="flex items-center gap-3 text-xs font-black text-slate-200">
@@ -576,9 +586,15 @@
                 const openWatchlistModal = async (item) => {
                     try {
                         const res = await fetch(`http://localhost:5000/api/media/${item.id}/details`);
-                        const data = await res.json();
-                        selectedSuggestion.value = data;
-                    } catch (e) {}
+                        if (res.ok) {
+                            const data = await res.json();
+                            selectedSuggestion.value = data;
+                        } else {
+                            console.error("Failed to fetch media details");
+                        }
+                    } catch (e) {
+                        console.error("Error opening modal:", e);
+                    }
                 };
 
                 const createBackup = async () => {
