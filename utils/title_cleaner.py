@@ -3,14 +3,17 @@ import re
 def clean_netflix_title(title):
     """
     Groups episodes into a single series name more aggressively.
-    Handles:
-    - Series: Season 1: Episode
-    - Series: Part 1: Episode
-    - Series - Season 1 - Episode
-    - Movie (Year)
     """
+    if not title:
+        return ""
+        
+    # Remove non-printable characters (like Zero Width Space \u200b)
+    # \u200b often appears in Netflix CSVs and mangles to ΓÇï in some encodings
+    title = "".join(char for char in title if char.isprintable())
+    title = title.strip()
+
     # If the title is just an episode number or starts with a colon (malformed CSV data)
-    if not title or title.strip().startswith(":") or title.strip().lower().startswith("episode"):
+    if title.startswith(":") or title.lower().startswith("episode"):
         return ""
 
     # Remove everything after common separators used for seasons/episodes
