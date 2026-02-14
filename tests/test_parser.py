@@ -38,3 +38,33 @@ def test_netflix_upload_duplicate(client, app):
     response = client.post('/api/upload-netflix', data=data, content_type='multipart/form-data')
     
     assert "Successfully imported 0" in response.json['message']
+
+def test_netflix_encoding_special_chars(client, app):
+    """Test uploading Netflix CSV with special characters and different encodings."""
+    # Pokémon in UTF-8 with BOM
+    csv_content = "Title,Date\nPokémon,2023-01-01\n"
+    data = {
+        'file': (io.BytesIO(csv_content.encode('utf-8-sig')), 'ViewingActivity.csv')
+    }
+    
+    response = client.post('/api/upload-netflix', data=data, content_type='multipart/form-data')
+    assert response.status_code == 200
+    
+    with app.app_context():
+        p = Media.query.filter_by(title="Pokémon").first()
+        assert p is not None
+        assert p.title == "Pokémon"
+
+    # Amélie in Latin-1
+    csv_content_latin1 = "Title,Date\nAmélie,2023-01-02\n"
+    data_latin1 = {
+        'file': (io.BytesIO(csv_content_latin1.encode('latin-1')), 'ViewingActivity.csv')
+    }
+    
+    response = client.post('/api/upload-netflix', data=data_latin1, content_type='multipart/form-data')
+    assert response.status_code == 200
+    
+    with app.app_context():
+        a = Media.query.filter_by(title="Amélie").first()
+        assert a is not None
+        assert a.title == "Amélie"
