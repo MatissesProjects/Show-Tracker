@@ -1,17 +1,20 @@
 from database import db
-from models import Media, Person, MediaPerson
+from models import Media, Person, MediaPerson, WatchHistory
 from utils.omdb import OMDBClient
+from utils.ai_analyst import AIAnalyst
 from utils.title_cleaner import clean_netflix_title
 from sqlalchemy import or_
+import json
 
 def enrich_media_data(db_instance):
     """
     Finds unique 'unknown' media or media missing rich data, 
-    cleans their titles, and fetches data from OMDb.
+    cleans their titles, and fetches data from OMDb and AI DNA.
     """
     client = OMDBClient()
+    analyst = AIAnalyst()
     
-    # Get media that is 'unknown' OR missing genre/rating data
+    # 1. Standard Metadata Enrichment (OMDb)
     to_enrich = db_instance.session.query(Media).filter(
         or_(
             Media.media_type == 'unknown',
@@ -20,7 +23,6 @@ def enrich_media_data(db_instance):
         )
     ).all()
     
-    # Group by cleaned title first to minimize API calls
     title_groups = {}
     for media in to_enrich:
         base_title = clean_netflix_title(media.title)
@@ -36,8 +38,27 @@ def enrich_media_data(db_instance):
                 apply_metadata(media, data, db_instance)
             enriched_count += 1
             
+    # 2. Thematic DNA Enrichment (AI)
+    # We prioritize watched media that doesn't have DNA yet
+    watched_without_dna = db_instance.session.query(Media).join(WatchHistory).filter(
+        Media.thematic_metadata == None,
+        Media.overview != None
+    ).distinct().limit(20).all() # Limit to avoid long timeouts
+    
+    dna_count = 0
+    if analyst.check_availability():
+        for media in watched_without_dna:
+            media_data = {
+                'Genre': media.genres,
+                'Plot': media.overview
+            }
+            dna_obj = analyst.extract_thematic_dna(media.title, media_data)
+            if dna_obj:
+                media.thematic_metadata = json.dumps(dna_obj)
+                dna_count += 1
+            
     db_instance.session.commit()
-    return enriched_count
+    return enriched_count, dna_count
 
 def apply_metadata(media, data, db_instance):
     """Applies OMDb data to a media object and its relationships."""

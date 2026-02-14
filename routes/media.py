@@ -189,7 +189,9 @@ def upload_netflix():
 def enrich_data():
     backup_database()
     try:
-        count = enrich_media_data(db)
-        return jsonify({'message': f'Successfully enriched {count} unique titles'}), 200
+        enriched_count, dna_count = enrich_media_data(db)
+        return jsonify({
+            'message': f'Successfully enriched {enriched_count} unique titles and extracted {dna_count} DNA signatures'
+        }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
