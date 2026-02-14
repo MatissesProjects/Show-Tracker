@@ -325,39 +325,83 @@
                 </div>
 
                 <!-- Sidebar -->
-                <div class='space-y-16'>
-                    <section class='glass rounded-[3rem] p-12 shadow-2xl border border-white/5'>
-                        <div class='space-y-8'>
-                            <div v-for='p in people.slice(0, 10)' :key='p.name + p.role' @click="toggleFilter('Person', p.name)" :class="isFilterActive('Person', p.name) ? 'bg-indigo-600/20 border-indigo-500/50' : 'hover:bg-white/5 border-transparent'" class='flex justify-between items-center p-4 -m-4 rounded-[1.5rem] transition-all cursor-pointer border'>
-                                <div><p class='font-black text-white text-lg tracking-tight'>{{ p.name }}</p><p class='text-[9px] uppercase tracking-[0.3em] text-slate-600 font-black mt-1'>{{ p.role }}</p></div><div class='bg-indigo-500/10 px-4 py-2 rounded-2xl text-[10px] font-black text-indigo-400'>{{ p.count }}</div>
+                <div class='space-y-12'>
+                    <!-- Talent Console -->
+                    <section class='glass rounded-[3rem] p-8 shadow-2xl border border-white/5'>
+                        <div class='flex justify-between items-center mb-6'>
+                            <h3 class='text-xl font-black text-white uppercase tracking-tighter'>Top Talent</h3>
+                            <span class='text-[10px] font-black text-slate-500 uppercase tracking-widest'>Core DNA</span>
+                        </div>
+                        <div class='grid grid-cols-1 gap-3'>
+                            <div v-for='p in people.slice(0, 8)' :key='p.name + p.role' @click="toggleFilter('Person', p.name)" :class="isFilterActive('Person', p.name) ? 'bg-indigo-600 border-indigo-500' : 'bg-white/5 border-transparent hover:bg-white/10'" class='flex justify-between items-center p-3 rounded-2xl transition-all cursor-pointer border group'>
+                                <div class='truncate mr-4'>
+                                    <p class='font-bold text-sm text-white truncate'>{{ p.name }}</p>
+                                    <p class='text-[8px] uppercase tracking-widest text-slate-500 group-hover:text-indigo-300 transition-colors'>{{ p.role }}</p>
+                                </div>
+                                <div class='bg-white/10 px-2.5 py-1 rounded-lg text-[9px] font-black text-slate-400 group-hover:text-white'>{{ p.count }}</div>
                             </div>
                         </div>
                     </section>
-                    <section class='glass rounded-[3rem] p-12 shadow-2xl border border-white/5'>
-                        <h3 class='text-2xl font-black mb-10 text-white uppercase tracking-tighter'>Genres</h3>
-                        <div class='flex flex-wrap gap-4'>
-                            <div v-for='g in genres.slice(0, 15)' :key='g.name' @click="toggleFilter('Genre', g.name)" :class="isFilterActive('Genre', g.name) ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-white/5 text-slate-400 hover:bg-white/10 border-white/5'" class='border px-6 py-3 rounded-[1.2rem] transition-all cursor-pointer transform hover:-translate-y-1'><span class='text-sm font-black tracking-wide'>{{ g.name }}</span><span class='ml-3 text-[10px] font-black opacity-40'>{{ g.count }}</span></div>
-                        </div>
-                    </section>
 
-                    <section class='glass rounded-[3rem] p-12 shadow-2xl border border-white/5' v-if="thematicStats.themes.length > 0">
-                        <h3 class='text-2xl font-black mb-10 text-white uppercase tracking-tighter'>Themes</h3>
-                        <div class='flex flex-wrap gap-4'>
-                            <div v-for='t in thematicStats.themes.slice(0, 15)' :key='t.name' @click="toggleFilter('Theme', t.name)" :class="isFilterActive('Theme', t.name) ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-white/5 text-slate-400 hover:bg-white/10 border-white/5'" class='border px-6 py-3 rounded-[1.2rem] transition-all cursor-pointer transform hover:-translate-y-1'><span class='text-sm font-black tracking-wide'>{{ t.name }}</span><span class='ml-3 text-[10px] font-black opacity-40'>{{ t.count }}</span></div>
+                    <!-- Taste DNA Console -->
+                    <section class='glass rounded-[3rem] p-8 shadow-2xl border border-white/5'>
+                        <div class='flex justify-between items-center mb-8'>
+                            <h3 class='text-xl font-black text-white uppercase tracking-tighter'>Taste DNA</h3>
+                            <div class='flex gap-1'>
+                                <span class='w-1 h-4 bg-indigo-500 rounded-full animate-pulse'></span>
+                                <span class='w-1 h-4 bg-indigo-400 rounded-full animate-pulse delay-75'></span>
+                                <span class='w-1 h-4 bg-indigo-300 rounded-full animate-pulse delay-150'></span>
+                            </div>
                         </div>
-                    </section>
 
-                    <section class='glass rounded-[3rem] p-12 shadow-2xl border border-white/5' v-if="thematicStats.moods.length > 0">
-                        <h3 class='text-2xl font-black mb-10 text-white uppercase tracking-tighter'>Moods</h3>
-                        <div class='flex flex-wrap gap-4'>
-                            <div v-for='m in thematicStats.moods.slice(0, 15)' :key='m.name' @click="toggleFilter('Mood', m.name)" :class="isFilterActive('Mood', m.name) ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-white/5 text-slate-400 hover:bg-white/10 border-white/5'" class='border px-6 py-3 rounded-[1.2rem] transition-all cursor-pointer transform hover:-translate-y-1'><span class='text-sm font-black tracking-wide'>{{ m.name }}</span><span class='ml-3 text-[10px] font-black opacity-40'>{{ m.count }}</span></div>
-                        </div>
-                    </section>
+                        <div class='space-y-10'>
+                            <!-- Sub-Group: Genres -->
+                            <div>
+                                <h4 class='text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4 flex items-center gap-2'>
+                                    <span class='w-4 h-[1px] bg-slate-800'></span> Genres
+                                </h4>
+                                <div class='flex flex-wrap gap-2'>
+                                    <button v-for='g in genres.slice(0, 12)' :key='g.name' @click="toggleFilter('Genre', g.name)" :class="isFilterActive('Genre', g.name) ? 'bg-indigo-600 text-white border-indigo-500 scale-105 shadow-lg shadow-indigo-500/20' : 'bg-white/5 text-slate-400 hover:bg-white/10 border-white/5'" class='border px-3 py-1.5 rounded-xl transition-all text-[10px] font-black uppercase tracking-wider'>
+                                        {{ g.name }}
+                                    </button>
+                                </div>
+                            </div>
 
-                    <section class='glass rounded-[3rem] p-12 shadow-2xl border border-white/5' v-if="thematicStats.aesthetics.length > 0">
-                        <h3 class='text-2xl font-black mb-10 text-white uppercase tracking-tighter'>Aesthetics</h3>
-                        <div class='flex flex-wrap gap-4'>
-                            <div v-for='a in thematicStats.aesthetics.slice(0, 15)' :key='a.name' @click="toggleFilter('Aesthetic', a.name)" :class="isFilterActive('Aesthetic', a.name) ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-white/5 text-slate-400 hover:bg-white/10 border-white/5'" class='border px-6 py-3 rounded-[1.2rem] transition-all cursor-pointer transform hover:-translate-y-1'><span class='text-sm font-black tracking-wide'>{{ a.name }}</span><span class='ml-3 text-[10px] font-black opacity-40'>{{ a.count }}</span></div>
+                            <!-- Sub-Group: Themes -->
+                            <div v-if="thematicStats.themes.length > 0">
+                                <h4 class='text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4 flex items-center gap-2'>
+                                    <span class='w-4 h-[1px] bg-slate-800'></span> Themes
+                                </h4>
+                                <div class='flex flex-wrap gap-2'>
+                                    <button v-for='t in thematicStats.themes.slice(0, 12)' :key='t.name' @click="toggleFilter('Theme', t.name)" :class="isFilterActive('Theme', t.name) ? 'bg-indigo-600 text-white border-indigo-500 scale-105 shadow-lg shadow-indigo-500/20' : 'bg-white/5 text-slate-400 hover:bg-white/10 border-white/5'" class='border px-3 py-1.5 rounded-xl transition-all text-[10px] font-black uppercase tracking-wider'>
+                                        {{ t.name }}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Sub-Group: Mood & Aesthetic -->
+                            <div class='grid grid-cols-1 gap-8'>
+                                <div v-if="thematicStats.moods.length > 0">
+                                    <h4 class='text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4 flex items-center gap-2'>
+                                        <span class='w-4 h-[1px] bg-slate-800'></span> Mood
+                                    </h4>
+                                    <div class='flex flex-wrap gap-2'>
+                                        <button v-for='m in thematicStats.moods.slice(0, 8)' :key='m.name' @click="toggleFilter('Mood', m.name)" :class="isFilterActive('Mood', m.name) ? 'bg-indigo-600 text-white border-indigo-500 scale-105 shadow-lg shadow-indigo-500/20' : 'bg-white/5 text-slate-400 hover:bg-white/10 border-white/5'" class='border px-3 py-1.5 rounded-xl transition-all text-[10px] font-black uppercase tracking-wider'>
+                                            {{ m.name }}
+                                        </button>
+                                    </div>
+                                </div>
+                                <div v-if="thematicStats.aesthetics.length > 0">
+                                    <h4 class='text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4 flex items-center gap-2'>
+                                        <span class='w-4 h-[1px] bg-slate-800'></span> Aesthetic
+                                    </h4>
+                                    <div class='flex flex-wrap gap-2'>
+                                        <button v-for='a in thematicStats.aesthetics.slice(0, 8)' :key='a.name' @click="toggleFilter('Aesthetic', a.name)" :class="isFilterActive('Aesthetic', a.name) ? 'bg-indigo-600 text-white border-indigo-500 scale-105 shadow-lg shadow-indigo-500/20' : 'bg-white/5 text-slate-400 hover:bg-white/10 border-white/5'" class='border px-3 py-1.5 rounded-xl transition-all text-[10px] font-black uppercase tracking-wider'>
+                                            {{ a.name }}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </section>
                 </div>
