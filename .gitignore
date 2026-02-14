@@ -10,9 +10,16 @@ venv/
 .env
 
 # SQLite
-*.db
+#*.db
 
 # Vue/Frontend
 dist/
 node_modules/
 .gemini/
+
+check_*.py
+backups/
+debug/
+dump_*sql
+migrated.db
+*copy.db

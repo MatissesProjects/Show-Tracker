@@ -8,6 +8,7 @@ from utils.parser import parse_netflix_history
 from utils.backup import backup_database
 from utils.title_cleaner import clean_netflix_title
 from utils.recommender import get_user_taste_profile, calculate_match_score
+from utils.ai_analyst import AIAnalyst
 from sqlalchemy import or_
 
 media_bp = Blueprint('media', __name__)
@@ -116,12 +117,22 @@ def get_media_details(media_id):
     
     score_data = calculate_match_score(media_data, profile)
     
+    # Generate/Retrieve AI Insight
+    ai_insight = m.ai_insight
+    if not ai_insight:
+        analyst = AIAnalyst()
+        if analyst.check_availability():
+            ai_insight = analyst.generate_insight(m.title, media_data, profile)
+            m.ai_insight = ai_insight
+            db.session.commit()
+
     result = m.to_dict()
     result.update({
         'year': m.release_date[:4] if m.release_date else '????',
         'poster': m.poster_url,
         'summary': m.overview or "No description available.",
         'match': score_data,
+        'ai_insight': ai_insight,
         'youtube_url': f"https://www.youtube.com/results?search_query={m.title.replace(' ', '+')}+funny+moments+clips",
         'on_netflix': False 
     })

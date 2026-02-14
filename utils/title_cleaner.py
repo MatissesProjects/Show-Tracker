@@ -9,6 +9,10 @@ def clean_netflix_title(title):
     - Series - Season 1 - Episode
     - Movie (Year)
     """
+    # If the title is just an episode number or starts with a colon (malformed CSV data)
+    if not title or title.strip().startswith(":") or title.strip().lower().startswith("episode"):
+        return ""
+
     # Remove everything after common separators used for seasons/episodes
     # Matches ": Season", ": Part", ": Volume", " - Season", etc.
     patterns = [

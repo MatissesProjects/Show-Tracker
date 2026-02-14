@@ -3,6 +3,7 @@ import requests
 import json
 import os
 from dotenv import load_dotenv
+from utils.cache import get_cached_response, set_cached_response
 
 load_dotenv()
 
@@ -22,9 +23,15 @@ class AIAnalyst:
         except:
             return False
 
-    def generate_insight(self, media_title, media_data, user_profile):
+    def generate_insight(self, media_title, media_data, user_profile, refresh=False):
         """Generates a personalized reasoning for why the user would like a specific media."""
         
+        cache_key = f"ai_insight_{media_title.lower().replace(' ', '_')}"
+        if not refresh:
+            cached = get_cached_response(cache_key, expiry_days=14)
+            if cached:
+                return cached
+
         # Format the prompt with user tastes
         loved_genres = list(user_profile.get('genres', {}).keys())[:5]
         top_people = list(user_profile.get('people', {}).keys())[:5]
@@ -62,13 +69,26 @@ class AIAnalyst:
                 timeout=120
             )
             if response.status_code == 200:
-                return response.json().get('response', '').strip()
+                insight = response.json().get('response', '').strip()
+                set_cached_response(cache_key, insight)
+                return insight
             return "Unable to generate AI insight at this time."
         except Exception as e:
             return f"AI Analyst Offline: {str(e)}"
 
-    def chat_with_library(self, query, library_context):
+    def chat_with_library(self, query, library_context, refresh=False):
         """Allows natural language queries over the user's library."""
+        
+        # Use a hash of the query for caching
+        import hashlib
+        query_hash = hashlib.md5(query.encode()).hexdigest()
+        cache_key = f"ai_chat_{query_hash}"
+        
+        if not refresh:
+            cached = get_cached_response(cache_key, expiry_days=7)
+            if cached:
+                return cached
+
         prompt = f"""
         You are an expert media assistant. The user is asking about their media library.
         
@@ -91,6 +111,8 @@ class AIAnalyst:
                 },
                 timeout=120
             )
-            return response.json().get('response', '').strip()
+            result = response.json().get('response', '').strip()
+            set_cached_response(cache_key, result)
+            return result
         except Exception as e:
             return "I'm having trouble accessing your library intelligence right now."

@@ -18,6 +18,7 @@ def ai_status():
 
 @ai_bp.route('/api/ai/deep-discovery', methods=['GET'])
 def deep_discovery():
+    refresh = request.args.get('refresh', 'false').lower() == 'true'
     profile = get_user_taste_profile()
     analyst = AIAnalyst()
     client = OMDBClient()
@@ -49,7 +50,7 @@ def deep_discovery():
     
     titles = []
     try:
-        response = analyst.chat_with_library(prompt, [])
+        response = analyst.chat_with_library(prompt, [], refresh=refresh)
         match = re.search(r'\[\s*".*"\s*\]', response, re.DOTALL)
         if match:
             titles = json.loads(match.group())

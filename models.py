@@ -24,6 +24,7 @@ class Media(db.Model):
     poster_url = db.Column(db.String(500))
     user_rating = db.Column(db.Integer, default=0, index=True) # 2: Love, 1: Like, -1: Dislike, 0: Neutral
     in_watchlist = db.Column(db.Boolean, default=False, index=True)
+    ai_insight = db.Column(db.Text)
     
     # Relationship via association object
     person_memberships = db.relationship("MediaPerson", back_populates="media", cascade="all, delete-orphan")
@@ -41,7 +42,8 @@ class Media(db.Model):
             'poster_url': self.poster_url,
             'user_rating': self.user_rating,
             'in_watchlist': self.in_watchlist or False,
-            'overview': self.overview
+            'overview': self.overview,
+            'ai_insight': self.ai_insight
         }
 
 class Person(db.Model):
@@ -61,3 +63,11 @@ class WatchHistory(db.Model):
     netflix_sentiment = db.Column(db.String(20)) # 'liked', 'disliked', etc.
     
     media = db.relationship('Media', backref=db.backref('watch_entries', lazy=True))
+
+class APICache(db.Model):
+    __tablename__ = 'api_cache'
+    id = db.Column(db.Integer, primary_key=True)
+    cache_key = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    response_data = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())

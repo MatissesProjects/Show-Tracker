@@ -98,24 +98,18 @@ def calculate_match_score(media_data, profile):
     except: pass
     return {'total_score': round(score, 1), 'breakdown': details}
 
+from utils.cache import get_cached_response, set_cached_response
 import time
 
-# Simple In-Memory Cache
-_suggestions_cache = {
-    'data': None,
-    'timestamp': 0,
-    'params_key': None
-}
-
 def get_proactive_suggestions(db_instance, limit=20, target_people=None, target_genres=None, refresh=False):
-    global _suggestions_cache
-    
     # Generate a key based on params
-    params_key = f"{target_people}-{target_genres}"
+    params_key = f"suggestions_{target_people}_{target_genres}"
     
-    # Return cache if less than 5 minutes old, UNLESS refresh is requested
-    if not refresh and _suggestions_cache['data'] and (time.time() - _suggestions_cache['timestamp'] < 300) and _suggestions_cache['params_key'] == params_key:
-        return _suggestions_cache['data']
+    # Return cache if less than 1 hour old, UNLESS refresh is requested
+    if not refresh:
+        cached = get_cached_response(params_key, expiry_days=0.04) # ~1 hour
+        if cached:
+            return cached
 
     profile = get_user_taste_profile()
     suggestions = []
@@ -143,9 +137,7 @@ def get_proactive_suggestions(db_instance, limit=20, target_people=None, target_
     result = sorted(high_quality if high_quality else unique_suggestions, key=lambda x: x['match']['total_score'], reverse=True)[:limit]
     
     # Store in cache
-    _suggestions_cache['data'] = result
-    _suggestions_cache['timestamp'] = time.time()
-    _suggestions_cache['params_key'] = params_key
+    set_cached_response(params_key, result)
     
     return result
 
@@ -183,56 +175,81 @@ def get_general_intelligence_suggestions(db_instance, profile, seen_titles, limi
 
 def fetch_by_person(person_name, profile, seen_titles, limit, session=None):
     if session is None: session = requests.Session()
+    
+    cache_key = f"tvmaze_person_{person_name.lower().replace(' ', '_')}"
+    cached_person_id = get_cached_response(cache_key)
+    
     results = []
     try:
-        person_res = session.get(f"https://api.tvmaze.com/search/people?q={requests.utils.quote(person_name)}", timeout=5)
-        if person_res.ok and person_res.json():
-            person_id = person_res.json()[0]['person']['id']
+        person_id = None
+        if cached_person_id:
+            person_id = cached_person_id
+        else:
+            person_res = session.get(f"https://api.tvmaze.com/search/people?q={requests.utils.quote(person_name)}", timeout=5)
+            if person_res.ok and person_res.json():
+                person_id = person_res.json()[0]['person']['id']
+                set_cached_response(cache_key, person_id)
+
+        if person_id:
+            # Check credits cache
+            credits_cache_key = f"tvmaze_credits_{person_id}"
+            cached_credits = get_cached_response(credits_cache_key, expiry_days=7)
             
-            # 1. Fetch Cast Credits
-            cast_res = session.get(f"https://api.tvmaze.com/people/{person_id}/castcredits?embed=show", timeout=5)
-            if cast_res.ok:
-                for credit in cast_res.json():
-                    show = credit['_embedded']['show']
-                    title_low = show['name'].lower()
-                    if title_low not in seen_titles:
-                        show['cast'] = [person_name]
-                        score_data = calculate_match_score(show, profile)
-                        results.append(format_suggestion(show, score_data))
-                        seen_titles.add(title_low)
-                    if len(results) >= limit: break
-            
-            # 2. Fetch Crew Credits (Directors, Creators)
-            if len(results) < limit:
+            credits_data = []
+            if cached_credits:
+                credits_data = cached_credits
+            else:
+                # 1. Fetch Cast Credits
+                cast_res = session.get(f"https://api.tvmaze.com/people/{person_id}/castcredits?embed=show", timeout=5)
+                if cast_res.ok:
+                    credits_data.extend(cast_res.json())
+                
+                # 2. Fetch Crew Credits (Directors, Creators)
                 crew_res = session.get(f"https://api.tvmaze.com/people/{person_id}/crewcredits?embed=show", timeout=5)
                 if crew_res.ok:
-                    for credit in crew_res.json():
-                        show = credit['_embedded']['show']
-                        title_low = show['name'].lower()
-                        if title_low not in seen_titles:
-                            show['cast'] = [person_name]
-                            score_data = calculate_match_score(show, profile)
-                            results.append(format_suggestion(show, score_data))
-                            seen_titles.add(title_low)
-                        if len(results) >= limit: break
+                    credits_data.extend(crew_res.json())
+                
+                set_cached_response(credits_cache_key, credits_data)
+
+            for credit in credits_data:
+                show = credit.get('_embedded', {}).get('show')
+                if not show: continue
+                title_low = show['name'].lower()
+                if title_low not in seen_titles:
+                    show['cast'] = [person_name]
+                    score_data = calculate_match_score(show, profile)
+                    results.append(format_suggestion(show, score_data))
+                    seen_titles.add(title_low)
+                if len(results) >= limit: break
     except Exception as e:
         print(f"Error fetching for {person_name}: {e}")
     return results
 
 def fetch_by_genre(genre_name, profile, seen_titles, limit, session=None):
     if session is None: session = requests.Session()
+    
+    cache_key = f"tvmaze_genre_{genre_name.lower()}"
+    cached = get_cached_response(cache_key, expiry_days=7)
+    
     results = []
     try:
-        genre_res = session.get(f"https://api.tvmaze.com/search/shows?q={requests.utils.quote(genre_name)}", timeout=5)
-        if genre_res.ok:
-            for item in genre_res.json():
-                show = item['show']
-                title_low = show['name'].lower()
-                if title_low not in seen_titles:
-                    score_data = calculate_match_score(show, profile)
-                    results.append(format_suggestion(show, score_data))
-                    seen_titles.add(title_low)
-                if len(results) >= limit: break
+        genre_data = []
+        if cached:
+            genre_data = cached
+        else:
+            genre_res = session.get(f"https://api.tvmaze.com/search/shows?q={requests.utils.quote(genre_name)}", timeout=5)
+            if genre_res.ok:
+                genre_data = genre_res.json()
+                set_cached_response(cache_key, genre_data)
+
+        for item in genre_data:
+            show = item['show']
+            title_low = show['name'].lower()
+            if title_low not in seen_titles:
+                score_data = calculate_match_score(show, profile)
+                results.append(format_suggestion(show, score_data))
+                seen_titles.add(title_low)
+            if len(results) >= limit: break
     except: pass
     return results
 
