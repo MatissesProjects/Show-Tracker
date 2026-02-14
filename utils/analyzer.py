@@ -27,6 +27,26 @@ def get_top_people(limit=20):
         for r in results
     ]
 
+def get_genre_stats():
+    """
+    Calculates genre preferences based on unique shows watched.
+    """
+    # Get all unique media that has been watched
+    watched_media = db.session.query(Media).join(
+        WatchHistory, Media.id == WatchHistory.media_id
+    ).distinct().all()
+    
+    genre_counts = {}
+    for media in watched_media:
+        if media.genres:
+            genres = media.genres.split(', ')
+            for g in genres:
+                genre_counts[g] = genre_counts.get(g, 0) + 1
+                
+    # Sort by count
+    sorted_genres = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)
+    return [{'name': g[0], 'count': g[1]} for g in sorted_genres]
+
 import json
 
 def get_thematic_stats():
