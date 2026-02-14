@@ -326,80 +326,70 @@
 
                 <!-- Sidebar -->
                 <div class='space-y-12'>
-                    <!-- Talent Console -->
-                    <section class='glass rounded-[3rem] p-8 shadow-2xl border border-white/5'>
-                        <div class='flex justify-between items-center mb-6'>
-                            <h3 class='text-xl font-black text-white uppercase tracking-tighter'>Top Talent</h3>
-                            <span class='text-[10px] font-black text-slate-500 uppercase tracking-widest'>Core DNA</span>
-                        </div>
-                        <div class='grid grid-cols-1 gap-3'>
-                            <div v-for='p in people.slice(0, 8)' :key='p.name + p.role' @click="toggleFilter('Person', p.name)" :class="isFilterActive('Person', p.name) ? 'bg-indigo-600 border-indigo-500' : 'bg-white/5 border-transparent hover:bg-white/10'" class='flex justify-between items-center p-3 rounded-2xl transition-all cursor-pointer border group'>
-                                <div class='truncate mr-4'>
-                                    <p class='font-bold text-sm text-white truncate'>{{ p.name }}</p>
-                                    <p class='text-[8px] uppercase tracking-widest text-slate-500 group-hover:text-indigo-300 transition-colors'>{{ p.role }}</p>
-                                </div>
-                                <div class='bg-white/10 px-2.5 py-1 rounded-lg text-[9px] font-black text-slate-400 group-hover:text-white'>{{ p.count }}</div>
-                            </div>
-                        </div>
-                    </section>
-
-                    <!-- Taste DNA Console -->
+                    <!-- Unified Intelligence Console -->
                     <section class='glass rounded-[3rem] p-8 shadow-2xl border border-white/5'>
                         <div class='flex justify-between items-center mb-8'>
-                            <h3 class='text-xl font-black text-white uppercase tracking-tighter'>Taste DNA</h3>
+                            <h3 class='text-xl font-black text-white uppercase tracking-tighter'>Intelligence Console</h3>
                             <div class='flex gap-1'>
-                                <span class='w-1 h-4 bg-indigo-500 rounded-full animate-pulse'></span>
-                                <span class='w-1 h-4 bg-indigo-400 rounded-full animate-pulse delay-75'></span>
-                                <span class='w-1 h-4 bg-indigo-300 rounded-full animate-pulse delay-150'></span>
+                                <span class='w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce'></span>
+                                <span class='w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce delay-100'></span>
+                                <span class='w-1.5 h-1.5 rounded-full bg-indigo-300 animate-bounce delay-200'></span>
                             </div>
                         </div>
 
                         <div class='space-y-10'>
-                            <!-- Sub-Group: Genres -->
-                            <div>
+                            <!-- Talent DNA -->
+                            <div v-if="thematicStats.talent && thematicStats.talent.length > 0">
                                 <h4 class='text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4 flex items-center gap-2'>
-                                    <span class='w-4 h-[1px] bg-slate-800'></span> Genres
+                                    <span class='w-4 h-[1px] bg-slate-800'></span> Top Talent
                                 </h4>
-                                <div class='flex flex-wrap gap-2'>
-                                    <button v-for='g in genres.slice(0, 12)' :key='g.name' @click="toggleFilter('Genre', g.name)" :class="isFilterActive('Genre', g.name) ? 'bg-indigo-600 text-white border-indigo-500 scale-105 shadow-lg shadow-indigo-500/20' : 'bg-white/5 text-slate-400 hover:bg-white/10 border-white/5'" class='border px-3 py-1.5 rounded-xl transition-all text-[10px] font-black uppercase tracking-wider'>
-                                        {{ g.name }}
-                                    </button>
+                                <div class='grid grid-cols-1 gap-2'>
+                                    <div v-for='p in thematicStats.talent.slice(0, 6)' :key='p.name' @click="toggleFilter('Person', p.name)" :class="isFilterActive('Person', p.name) ? 'bg-indigo-600 border-indigo-500' : 'bg-white/5 border-transparent hover:bg-white/10'" class='flex justify-between items-center px-4 py-2 rounded-xl transition-all cursor-pointer border group'>
+                                        <p class='font-bold text-xs text-white truncate mr-4'>{{ p.name }}</p>
+                                        <div class='bg-white/10 px-2 py-0.5 rounded-lg text-[8px] font-black text-slate-400 group-hover:text-white'>{{ p.count }}</div>
+                                    </div>
                                 </div>
                             </div>
 
-                            <!-- Sub-Group: Themes -->
-                            <div v-if="thematicStats.themes.length > 0">
+                            <!-- Narrative DNA (Genres & Tropes) -->
+                            <div>
                                 <h4 class='text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4 flex items-center gap-2'>
-                                    <span class='w-4 h-[1px] bg-slate-800'></span> Themes
+                                    <span class='w-4 h-[1px] bg-slate-800'></span> Narrative
                                 </h4>
                                 <div class='flex flex-wrap gap-2'>
-                                    <button v-for='t in thematicStats.themes.slice(0, 12)' :key='t.name' @click="toggleFilter('Theme', t.name)" :class="isFilterActive('Theme', t.name) ? 'bg-indigo-600 text-white border-indigo-500 scale-105 shadow-lg shadow-indigo-500/20' : 'bg-white/5 text-slate-400 hover:bg-white/10 border-white/5'" class='border px-3 py-1.5 rounded-xl transition-all text-[10px] font-black uppercase tracking-wider'>
+                                    <button v-for='g in thematicStats.genres.slice(0, 10)' :key='g.name' @click="toggleFilter('Genre', g.name)" :class="isFilterActive('Genre', g.name) ? 'bg-indigo-600 text-white border-indigo-500 scale-105 shadow-lg shadow-indigo-500/20' : 'bg-white/5 text-slate-400 hover:bg-white/10 border-white/5'" class='border px-3 py-1.5 rounded-xl transition-all text-[10px] font-black uppercase tracking-wider'>
+                                        {{ g.name }}
+                                    </button>
+                                    <button v-for='t in thematicStats.tropes.slice(0, 8)' :key='t.name' @click="toggleFilter('Theme', t.name)" :class="isFilterActive('Theme', t.name) ? 'bg-indigo-600 text-white border-indigo-500 scale-105 shadow-lg shadow-indigo-500/20' : 'bg-white/5 text-amber-400 hover:bg-white/10 border-white/5'" class='border px-3 py-1.5 rounded-xl transition-all text-[10px] font-black uppercase tracking-wider'>
                                         {{ t.name }}
                                     </button>
                                 </div>
                             </div>
 
-                            <!-- Sub-Group: Mood & Aesthetic -->
-                            <div class='grid grid-cols-1 gap-8'>
-                                <div v-if="thematicStats.moods.length > 0">
-                                    <h4 class='text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4 flex items-center gap-2'>
-                                        <span class='w-4 h-[1px] bg-slate-800'></span> Mood
-                                    </h4>
-                                    <div class='flex flex-wrap gap-2'>
-                                        <button v-for='m in thematicStats.moods.slice(0, 8)' :key='m.name' @click="toggleFilter('Mood', m.name)" :class="isFilterActive('Mood', m.name) ? 'bg-indigo-600 text-white border-indigo-500 scale-105 shadow-lg shadow-indigo-500/20' : 'bg-white/5 text-slate-400 hover:bg-white/10 border-white/5'" class='border px-3 py-1.5 rounded-xl transition-all text-[10px] font-black uppercase tracking-wider'>
-                                            {{ m.name }}
-                                        </button>
-                                    </div>
+                            <!-- Structural DNA (Themes & Moods) -->
+                            <div v-if="thematicStats.themes.length > 0">
+                                <h4 class='text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4 flex items-center gap-2'>
+                                    <span class='w-4 h-[1px] bg-slate-800'></span> Elements
+                                </h4>
+                                <div class='flex flex-wrap gap-2'>
+                                    <button v-for='t in thematicStats.themes.slice(0, 10)' :key='t.name' @click="toggleFilter('Theme', t.name)" :class="isFilterActive('Theme', t.name) ? 'bg-indigo-600 text-white border-indigo-500 scale-105 shadow-lg shadow-indigo-500/20' : 'bg-white/5 text-slate-400 hover:bg-white/10 border-white/5'" class='border px-3 py-1.5 rounded-xl transition-all text-[10px] font-black uppercase tracking-wider'>
+                                        {{ t.name }}
+                                    </button>
+                                    <button v-for='m in thematicStats.moods.slice(0, 8)' :key='m.name' @click="toggleFilter('Mood', m.name)" :class="isFilterActive('Mood', m.name) ? 'bg-indigo-600 text-white border-indigo-500 scale-105 shadow-lg shadow-indigo-500/20' : 'bg-white/5 text-indigo-400 hover:bg-white/10 border-white/5'" class='border px-3 py-1.5 rounded-xl transition-all text-[10px] font-black uppercase tracking-wider'>
+                                        {{ m.name }}
+                                    </button>
                                 </div>
-                                <div v-if="thematicStats.aesthetics.length > 0">
-                                    <h4 class='text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4 flex items-center gap-2'>
-                                        <span class='w-4 h-[1px] bg-slate-800'></span> Aesthetic
-                                    </h4>
-                                    <div class='flex flex-wrap gap-2'>
-                                        <button v-for='a in thematicStats.aesthetics.slice(0, 8)' :key='a.name' @click="toggleFilter('Aesthetic', a.name)" :class="isFilterActive('Aesthetic', a.name) ? 'bg-indigo-600 text-white border-indigo-500 scale-105 shadow-lg shadow-indigo-500/20' : 'bg-white/5 text-slate-400 hover:bg-white/10 border-white/5'" class='border px-3 py-1.5 rounded-xl transition-all text-[10px] font-black uppercase tracking-wider'>
-                                            {{ a.name }}
-                                        </button>
-                                    </div>
+                            </div>
+
+                            <!-- Visual DNA (Aesthetics) -->
+                            <div v-if="thematicStats.aesthetics.length > 0">
+                                <h4 class='text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4 flex items-center gap-2'>
+                                    <span class='w-4 h-[1px] bg-slate-800'></span> Aesthetic
+                                </h4>
+                                <div class='flex flex-wrap gap-2'>
+                                    <button v-for='a in thematicStats.aesthetics.slice(0, 10)' :key='a.name' @click="toggleFilter('Aesthetic', a.name)" :class="isFilterActive('Aesthetic', a.name) ? 'bg-indigo-600 text-white border-indigo-500 scale-105 shadow-lg shadow-indigo-500/20' : 'bg-white/5 text-slate-400 hover:bg-white/10 border-white/5'" class='border px-3 py-1.5 rounded-xl transition-all text-[10px] font-black uppercase tracking-wider'>
+                                        {{ a.name }}
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -707,9 +697,9 @@
                     } catch (e) {} finally { searching.value = false }
                 };
 
-                const fetchGenreStats = async () => { try { const res = await fetch('http://localhost:5000/api/stats/genres'); const data = await res.json(); genres.value = Array.isArray(data) ? data : []; } catch (e) { genres.value = []; } };
-                const fetchThematicStats = async () => { try { const res = await fetch('http://localhost:5000/api/stats/thematic'); const data = await res.json(); thematicStats.value = data || { themes: [], moods: [], aesthetics: [] }; } catch (e) { thematicStats.value = { themes: [], moods: [], aesthetics: [] }; } };
-                const fetchPeopleStats = async () => { try { const res = await fetch('http://localhost:5000/api/stats/people'); const data = await res.json(); people.value = Array.isArray(data) ? data : []; } catch (e) { people.value = []; } };
+                const fetchGenreStats = async () => { /* Decommissioned in favor of unified thematicStats */ };
+                const fetchThematicStats = async () => { try { const res = await fetch('http://localhost:5000/api/stats/thematic'); const data = await res.json(); thematicStats.value = data || { talent: [], genres: [], themes: [], moods: [], aesthetics: [], tropes: [] }; } catch (e) { thematicStats.value = { talent: [], genres: [], themes: [], moods: [], aesthetics: [], tropes: [] }; } };
+                const fetchPeopleStats = async () => { /* Decommissioned in favor of unified thematicStats */ };
                 const fetchMedia = async (page = null) => { 
                     const targetPage = page || currentPage.value;
                     if (mediaCache.has(targetPage)) {
@@ -774,12 +764,12 @@
                     try {
                         const res = await fetch('http://localhost:5000/api/health');
                         health.value = await res.json();
-                        fetchMedia(); fetchPeopleStats(); fetchGenreStats(); fetchThematicStats(); fetchWatchlist(); fetchSuggestions();
+                        fetchMedia(); fetchThematicStats(); fetchWatchlist(); fetchSuggestions();
                         checkAiStatus();
                     } catch (e) {}
                 });
 
-                return { health, media, totalMedia, people, genres, thematicStats, suggestions, refreshingSuggestions, loadingWatchlist, activeFilters, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal, fetchSuggestions, toggleFilter, isFilterActive, clearFilters, watchlist, toggleWatchlist, addToWatchlist, rateSearchResult, selectedSuggestion, openModal, closeModal, openWatchlistModal, getTrailerUrl, handleImageError, refreshMedia, rateExternalFromModal, addToWatchlistFromModal, createBackup, deepDiscoveries, discovering, runDeepDiscovery, aiAvailable, checkAiStatus, loadingMedia }
+                return { health, media, totalMedia, thematicStats, suggestions, refreshingSuggestions, loadingWatchlist, activeFilters, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal, fetchSuggestions, toggleFilter, isFilterActive, clearFilters, watchlist, toggleWatchlist, addToWatchlist, rateSearchResult, selectedSuggestion, openModal, closeModal, openWatchlistModal, getTrailerUrl, handleImageError, refreshMedia, rateExternalFromModal, addToWatchlistFromModal, createBackup, deepDiscoveries, discovering, runDeepDiscovery, aiAvailable, checkAiStatus, loadingMedia }
             }
         }).mount('#app')
     </script>
