@@ -339,6 +339,27 @@
                             <div v-for='g in genres.slice(0, 15)' :key='g.name' @click="toggleFilter('Genre', g.name)" :class="isFilterActive('Genre', g.name) ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-white/5 text-slate-400 hover:bg-white/10 border-white/5'" class='border px-6 py-3 rounded-[1.2rem] transition-all cursor-pointer transform hover:-translate-y-1'><span class='text-sm font-black tracking-wide'>{{ g.name }}</span><span class='ml-3 text-[10px] font-black opacity-40'>{{ g.count }}</span></div>
                         </div>
                     </section>
+
+                    <section class='glass rounded-[3rem] p-12 shadow-2xl border border-white/5' v-if="thematicStats.themes.length > 0">
+                        <h3 class='text-2xl font-black mb-10 text-white uppercase tracking-tighter'>Themes</h3>
+                        <div class='flex flex-wrap gap-4'>
+                            <div v-for='t in thematicStats.themes.slice(0, 15)' :key='t.name' @click="toggleFilter('Theme', t.name)" :class="isFilterActive('Theme', t.name) ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-white/5 text-slate-400 hover:bg-white/10 border-white/5'" class='border px-6 py-3 rounded-[1.2rem] transition-all cursor-pointer transform hover:-translate-y-1'><span class='text-sm font-black tracking-wide'>{{ t.name }}</span><span class='ml-3 text-[10px] font-black opacity-40'>{{ t.count }}</span></div>
+                        </div>
+                    </section>
+
+                    <section class='glass rounded-[3rem] p-12 shadow-2xl border border-white/5' v-if="thematicStats.moods.length > 0">
+                        <h3 class='text-2xl font-black mb-10 text-white uppercase tracking-tighter'>Moods</h3>
+                        <div class='flex flex-wrap gap-4'>
+                            <div v-for='m in thematicStats.moods.slice(0, 15)' :key='m.name' @click="toggleFilter('Mood', m.name)" :class="isFilterActive('Mood', m.name) ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-white/5 text-slate-400 hover:bg-white/10 border-white/5'" class='border px-6 py-3 rounded-[1.2rem] transition-all cursor-pointer transform hover:-translate-y-1'><span class='text-sm font-black tracking-wide'>{{ m.name }}</span><span class='ml-3 text-[10px] font-black opacity-40'>{{ m.count }}</span></div>
+                        </div>
+                    </section>
+
+                    <section class='glass rounded-[3rem] p-12 shadow-2xl border border-white/5' v-if="thematicStats.aesthetics.length > 0">
+                        <h3 class='text-2xl font-black mb-10 text-white uppercase tracking-tighter'>Aesthetics</h3>
+                        <div class='flex flex-wrap gap-4'>
+                            <div v-for='a in thematicStats.aesthetics.slice(0, 15)' :key='a.name' @click="toggleFilter('Aesthetic', a.name)" :class="isFilterActive('Aesthetic', a.name) ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-white/5 text-slate-400 hover:bg-white/10 border-white/5'" class='border px-6 py-3 rounded-[1.2rem] transition-all cursor-pointer transform hover:-translate-y-1'><span class='text-sm font-black tracking-wide'>{{ a.name }}</span><span class='ml-3 text-[10px] font-black opacity-40'>{{ a.count }}</span></div>
+                        </div>
+                    </section>
                 </div>
             </div>
         </main>
@@ -419,6 +440,7 @@
             setup() {
                 const health = ref(null); const media = ref([]); const totalMedia = ref(0);
                 const people = ref([]); const genres = ref([]); const suggestions = ref([]);
+                const thematicStats = ref({ themes: [], moods: [], aesthetics: [] });
                 const watchlist = ref([]); const refreshingSuggestions = ref(false);
                 const loadingWatchlist = ref(false); const activeFilters = ref([]);
                 const currentPage = ref(1); const totalPages = ref(1);
@@ -535,7 +557,16 @@
                     if (activeFilters.value.length > 0 || refresh) suggestions.value = [];
                     try {
                         let params = new URLSearchParams();
-                        activeFilters.value.forEach(f => params.append(f.type === 'Person' ? 'person' : 'genre', f.value));
+                        activeFilters.value.forEach(f => {
+                            const typeMap = {
+                                'Person': 'person',
+                                'Genre': 'genre',
+                                'Theme': 'theme',
+                                'Mood': 'mood',
+                                'Aesthetic': 'aesthetic'
+                            };
+                            params.append(typeMap[f.type] || 'genre', f.value);
+                        });
                         if (refresh) params.append('refresh', 'true');
                         const res = await fetch(`http://localhost:5000/api/suggestions?${params.toString()}`);
                         const data = await res.json();
@@ -620,7 +651,7 @@
                             body: JSON.stringify({ title, rating })
                         });
                         suggestions.value = suggestions.value.filter(s => s.title !== title);
-                        Promise.all([fetchMedia(), fetchPeopleStats(), fetchWatchlist(), fetchSuggestions()]);
+                        Promise.all([fetchMedia(), fetchPeopleStats(), fetchThematicStats(), fetchWatchlist(), fetchSuggestions()]);
                     } catch (e) {}
                 };
 
@@ -633,6 +664,7 @@
                 };
 
                 const fetchGenreStats = async () => { try { const res = await fetch('http://localhost:5000/api/stats/genres'); const data = await res.json(); genres.value = Array.isArray(data) ? data : []; } catch (e) { genres.value = []; } };
+                const fetchThematicStats = async () => { try { const res = await fetch('http://localhost:5000/api/stats/thematic'); const data = await res.json(); thematicStats.value = data || { themes: [], moods: [], aesthetics: [] }; } catch (e) { thematicStats.value = { themes: [], moods: [], aesthetics: [] }; } };
                 const fetchPeopleStats = async () => { try { const res = await fetch('http://localhost:5000/api/stats/people'); const data = await res.json(); people.value = Array.isArray(data) ? data : []; } catch (e) { people.value = []; } };
                 const fetchMedia = async (page = null) => { 
                     const targetPage = page || currentPage.value;
@@ -686,24 +718,24 @@
                         
                         mediaCache.clear();
                         // Fire refreshes in parallel to fill the gap and update stats
-                        Promise.all([fetchMedia(), fetchPeopleStats(), fetchWatchlist(), fetchSuggestions()]);
+                        Promise.all([fetchMedia(), fetchPeopleStats(), fetchThematicStats(), fetchWatchlist(), fetchSuggestions()]);
                     } catch (e) { fetchMedia(); }
                 };
 
                 const handleFileUpload = async (event) => { selectedFile.value = event.target.files[0]; if (selectedFile.value) await uploadFile(); };
                 const uploadFile = async () => { uploading.value = true; uploadStatus.value = 'Analyzing...'; const formData = new FormData(); formData.append('file', selectedFile.value); try { const res = await fetch('http://localhost:5000/api/upload-netflix', { method: 'POST', body: formData }); const result = await res.json(); uploadStatus.value = result.message; await fetchMedia(); } catch (e) {} finally { uploading.value = false } };
-                const enrichData = async () => { enriching.value = true; uploadStatus.value = 'Enriching...'; try { const res = await fetch('http://localhost:5000/api/enrich', { method: 'POST' }); const result = await res.json(); uploadStatus.value = result.message; await fetchMedia(); await fetchPeopleStats(); await fetchGenreStats(); await fetchWatchlist(); await fetchSuggestions();} catch (e) {} finally { enriching.value = false } };
+                const enrichData = async () => { enriching.value = true; uploadStatus.value = 'Enriching...'; try { const res = await fetch('http://localhost:5000/api/enrich', { method: 'POST' }); const result = await res.json(); uploadStatus.value = result.message; await fetchMedia(); await fetchPeopleStats(); await fetchGenreStats(); await fetchThematicStats(); await fetchWatchlist(); await fetchSuggestions();} catch (e) {} finally { enriching.value = false } };
 
                 onMounted(async () => {
                     try {
                         const res = await fetch('http://localhost:5000/api/health');
                         health.value = await res.json();
-                        fetchMedia(); fetchPeopleStats(); fetchGenreStats(); fetchWatchlist(); fetchSuggestions();
+                        fetchMedia(); fetchPeopleStats(); fetchGenreStats(); fetchThematicStats(); fetchWatchlist(); fetchSuggestions();
                         checkAiStatus();
                     } catch (e) {}
                 });
 
-                return { health, media, totalMedia, people, genres, suggestions, refreshingSuggestions, loadingWatchlist, activeFilters, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal, fetchSuggestions, toggleFilter, isFilterActive, clearFilters, watchlist, toggleWatchlist, addToWatchlist, rateSearchResult, selectedSuggestion, openModal, closeModal, openWatchlistModal, getTrailerUrl, handleImageError, refreshMedia, rateExternalFromModal, addToWatchlistFromModal, createBackup, deepDiscoveries, discovering, runDeepDiscovery, aiAvailable, checkAiStatus, loadingMedia }
+                return { health, media, totalMedia, people, genres, thematicStats, suggestions, refreshingSuggestions, loadingWatchlist, activeFilters, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal, fetchSuggestions, toggleFilter, isFilterActive, clearFilters, watchlist, toggleWatchlist, addToWatchlist, rateSearchResult, selectedSuggestion, openModal, closeModal, openWatchlistModal, getTrailerUrl, handleImageError, refreshMedia, rateExternalFromModal, addToWatchlistFromModal, createBackup, deepDiscoveries, discovering, runDeepDiscovery, aiAvailable, checkAiStatus, loadingMedia }
             }
         }).mount('#app')
     </script>

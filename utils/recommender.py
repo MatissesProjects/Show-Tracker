@@ -182,9 +182,11 @@ def calculate_match_score(media_data, profile):
 from utils.cache import get_cached_response, set_cached_response
 import time
 
-def get_proactive_suggestions(db_instance, limit=20, target_people=None, target_genres=None, refresh=False):
+def get_proactive_suggestions(db_instance, limit=20, target_people=None, target_genres=None, 
+                              target_themes=None, target_moods=None, target_aesthetics=None,
+                              refresh=False):
     # Generate a key based on params
-    params_key = f"suggestions_v2_{target_people}_{target_genres}"
+    params_key = f"suggestions_v3_{target_people}_{target_genres}_{target_themes}_{target_moods}_{target_aesthetics}"
     
     # Return cache if less than 2 hours old, UNLESS refresh is requested
     if not refresh:
@@ -200,11 +202,16 @@ def get_proactive_suggestions(db_instance, limit=20, target_people=None, target_
     session = requests.Session()
     
     # Strategy A: Direct Filtering (User Requested)
-    if target_people or target_genres:
+    if any([target_people, target_genres, target_themes, target_moods, target_aesthetics]):
         for p in (target_people or []): 
             suggestions.extend(fetch_by_person(p, profile, seen_titles, limit, session))
         for g in (target_genres or []): 
             suggestions.extend(fetch_by_genre(g, profile, seen_titles, limit, session))
+            
+        # Thematic filtering requires AI brainstorming for candidates since TVMaze doesn't have themes
+        thematic_queries = (target_themes or []) + (target_moods or []) + (target_aesthetics or [])
+        for query in thematic_queries:
+            suggestions.extend(fetch_by_thematic_discovery(query, profile, seen_titles, session))
             
     # Strategy B: AI-Powered Thematic Brainstorming (NEW)
     # This finds titles that aren't just direct actor/genre matches but share "Vibe DNA"
@@ -263,6 +270,31 @@ def get_ai_thematic_candidates(profile, seen_titles):
         return re.findall(r'"([^"]*)"', response)
     except:
         return []
+
+def fetch_by_thematic_discovery(query, profile, seen_titles, session=None):
+    """Uses AI to find candidates for a specific theme/mood/aesthetic."""
+    from utils.ai_analyst import AIAnalyst
+    analyst = AIAnalyst()
+    if not analyst.check_availability():
+        return []
+        
+    prompt = f"Suggest 5 TV shows or movies that perfectly embody the DNA of '{query}'. Output ONLY a JSON list of titles."
+    
+    results = []
+    try:
+        import re, json
+        response = analyst.chat_with_library(prompt, [])
+        match = re.search(r'\[\s*".*"\s*\]', response, re.DOTALL)
+        titles = json.loads(match.group()) if match else re.findall(r'"([^"]*)"', response)
+        
+        for title in titles:
+            data = fetch_by_title_tvmaze(title, profile, seen_titles, session)
+            if data:
+                data['match']['total_score'] += 20
+                data['match']['breakdown'].append(f"Thematic match for '{query}' (+20)")
+                results.append(data)
+    except: pass
+    return results
 
 def fetch_by_title_tvmaze(title, profile, seen_titles, session=None):
     """Specific fetcher for a single title."""

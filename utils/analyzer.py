@@ -27,22 +27,38 @@ def get_top_people(limit=20):
         for r in results
     ]
 
-def get_genre_stats():
+import json
+
+def get_thematic_stats():
     """
-    Calculates genre preferences based on unique shows watched.
+    Calculates thematic DNA preferences based on unique shows watched.
     """
-    # Get all unique media that has been watched
     watched_media = db.session.query(Media).join(
         WatchHistory, Media.id == WatchHistory.media_id
     ).distinct().all()
     
-    genre_counts = {}
+    stats = {
+        'themes': {},
+        'moods': {},
+        'aesthetics': {}
+    }
+    
     for media in watched_media:
-        if media.genres:
-            genres = media.genres.split(', ')
-            for g in genres:
-                genre_counts[g] = genre_counts.get(g, 0) + 1
-                
-    # Sort by count
-    sorted_genres = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)
-    return [{'name': g[0], 'count': g[1]} for g in sorted_genres]
+        if media.thematic_metadata:
+            try:
+                dna = json.loads(media.thematic_metadata)
+                for t in dna.get('themes', []):
+                    stats['themes'][t] = stats['themes'].get(t, 0) + 1
+                for m in dna.get('mood', []):
+                    stats['moods'][m] = stats['moods'].get(m, 0) + 1
+                for a in dna.get('aesthetic', []):
+                    stats['aesthetics'][a] = stats['aesthetics'].get(a, 0) + 1
+            except: pass
+            
+    # Format and sort
+    result = {}
+    for key in stats:
+        sorted_items = sorted(stats[key].items(), key=lambda x: x[1], reverse=True)
+        result[key] = [{'name': item[0], 'count': item[1]} for item in sorted_items]
+        
+    return result

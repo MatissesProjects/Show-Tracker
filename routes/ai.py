@@ -115,10 +115,22 @@ def discover_media():
 def get_suggestions():
     people = request.args.getlist('person')
     genres = request.args.getlist('genre')
+    themes = request.args.getlist('theme')
+    moods = request.args.getlist('mood')
+    aesthetics = request.args.getlist('aesthetic')
     refresh = request.args.get('refresh', 'false').lower() == 'true'
     
     try:
-        suggestions = get_proactive_suggestions(db, limit=20, target_people=people, target_genres=genres, refresh=refresh)
+        suggestions = get_proactive_suggestions(
+            db, 
+            limit=20, 
+            target_people=people, 
+            target_genres=genres, 
+            target_themes=themes,
+            target_moods=moods,
+            target_aesthetics=aesthetics,
+            refresh=refresh
+        )
         return jsonify(suggestions), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
