@@ -27,6 +27,7 @@ def get_smart_collections():
                         'title': f'The {person_name} Collection',
                         'subtitle': f'Based on your affinity for {person_name}',
                         'type': 'talent',
+                        'seed': person_name,
                         'items': items
                     })
 
@@ -48,6 +49,7 @@ def get_smart_collections():
                     'title': f'{genre_name} Masterpieces',
                     'subtitle': f'Top-tier {genre_name.lower()} from your library',
                     'type': 'genre',
+                    'seed': genre_name,
                     'items': items
                 })
 
@@ -68,6 +70,7 @@ def get_smart_collections():
                     'title': f'The {mood_name} Vibe',
                     'subtitle': f'Media that matches your {mood_name.lower()} mood',
                     'type': 'vibe',
+                    'seed': mood_name,
                     'items': items
                 })
 

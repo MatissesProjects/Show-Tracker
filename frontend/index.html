@@ -513,10 +513,30 @@
                             <div class="mt-8" v-if="selectedSuggestion.thematic_dna">
                                 <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-3">Narrative DNA</h4>
                                 <div class="flex flex-wrap gap-2">
-                                    <span v-for="t in selectedSuggestion.thematic_dna.themes" :key="t" class="bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider">{{ t }}</span>
-                                    <span v-for="m in selectedSuggestion.thematic_dna.mood" :key="m" class="bg-blue-600/20 text-blue-400 border border-blue-500/30 px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider">{{ m }}</span>
-                                    <span v-for="a in selectedSuggestion.thematic_dna.aesthetic" :key="a" class="bg-purple-600/20 text-purple-400 border border-purple-500/30 px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider">{{ a }}</span>
-                                    <span v-for="tr in selectedSuggestion.thematic_dna.tropes" :key="tr" class="bg-amber-600/20 text-amber-400 border border-amber-500/30 px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider">{{ tr }}</span>
+                                    <button v-for="t in selectedSuggestion.thematic_dna.themes" :key="t" 
+                                        @click="toggleFilter('Theme', t)"
+                                        :class="isFilterActive('Theme', t) ? 'bg-indigo-600 text-white border-indigo-400' : 'bg-indigo-600/20 text-indigo-400 border-indigo-500/30 hover:bg-indigo-600/40'"
+                                        class="border px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all">
+                                        {{ t }}
+                                    </button>
+                                    <button v-for="m in selectedSuggestion.thematic_dna.mood" :key="m" 
+                                        @click="toggleFilter('Mood', m)"
+                                        :class="isFilterActive('Mood', m) ? 'bg-blue-600 text-white border-blue-400' : 'bg-blue-600/20 text-blue-400 border-blue-500/30 hover:bg-blue-600/40'"
+                                        class="border px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all">
+                                        {{ m }}
+                                    </button>
+                                    <button v-for="a in selectedSuggestion.thematic_dna.aesthetic" :key="a" 
+                                        @click="toggleFilter('Aesthetic', a)"
+                                        :class="isFilterActive('Aesthetic', a) ? 'bg-purple-600 text-white border-purple-400' : 'bg-purple-600/20 text-purple-400 border-purple-500/30 hover:bg-purple-600/40'"
+                                        class="border px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all">
+                                        {{ a }}
+                                    </button>
+                                    <button v-for="tr in selectedSuggestion.thematic_dna.tropes" :key="tr" 
+                                        @click="toggleFilter('Theme', tr)"
+                                        :class="isFilterActive('Theme', tr) ? 'bg-amber-600 text-white border-amber-400' : 'bg-amber-600/20 text-amber-400 border-amber-500/30 hover:bg-amber-600/40'"
+                                        class="border px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all">
+                                        {{ tr }}
+                                    </button>
                                 </div>
                             </div>
 
@@ -565,6 +585,10 @@
                             <span class='bg-purple-600 text-white text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-widest mb-4 inline-block shadow-2xl'>Dynamic Collection</span>
                             <h2 class="text-5xl font-black text-white leading-tight uppercase tracking-tighter">{{ selectedCollection.title }}</h2>
                             <p class="text-slate-400 font-bold uppercase tracking-widest text-xs mt-2">{{ selectedCollection.subtitle }} • {{ selectedCollection.items.length }} Curated Items</p>
+                            <button @click="discoverFromCollection" class="mt-6 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest transition-all flex items-center gap-3 shadow-lg shadow-indigo-500/20">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                                Discover Similar Media
+                            </button>
                         </div>
                         <button @click="closeCollection" class="p-4 rounded-full glass hover:bg-white/10 transition-all text-white shadow-2xl border border-white/10"><svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
                     </div>
@@ -653,6 +677,30 @@
 
                 const openCollection = (collection) => { selectedCollection.value = collection; };
                 const closeCollection = () => { selectedCollection.value = null; };
+
+                const discoverFromCollection = async () => {
+                    if (!selectedCollection.value) return;
+                    
+                    const col = selectedCollection.value;
+                    const typeMap = {
+                        'talent': 'Person',
+                        'genre': 'Genre',
+                        'vibe': 'Mood'
+                    };
+                    
+                    // Clear existing and set new filter
+                    activeFilters.value = [{ type: typeMap[col.type], value: col.seed }];
+                    
+                    // Fetch suggestions
+                    await fetchSuggestions();
+                    
+                    // Close and scroll
+                    closeCollection();
+                    setTimeout(() => {
+                        const recSection = document.querySelector('section[v-if="suggestions.length > 0 || refreshingSuggestions"]');
+                        if (recSection) recSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }, 300);
+                };
 
                 const checkAiStatus = async () => {
                     try {
@@ -976,7 +1024,7 @@
                     } catch (e) {}
                 });
 
-                return { health, media, totalMedia, thematicStats, suggestions, refreshingSuggestions, collections, fetchCollections, selectedCollection, openCollection, closeCollection, loadingWatchlist, activeFilters, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, searchSuggestions, onSearchInput, selectSuggestion, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal, fetchSuggestions, toggleFilter, isFilterActive, clearFilters, watchlist, toggleWatchlist, addToWatchlist, rateSearchResult, selectedSuggestion, openModal, closeModal, openWatchlistModal, getTrailerUrl, handleImageError, refreshMedia, rateExternalFromModal, addToWatchlistFromModal, createBackup, deepDiscoveries, discovering, runDeepDiscovery, aiAvailable, checkAiStatus, loadingMedia }
+                return { health, media, totalMedia, thematicStats, suggestions, refreshingSuggestions, collections, fetchCollections, selectedCollection, openCollection, closeCollection, discoverFromCollection, loadingWatchlist, activeFilters, uploading, enriching, searching, uploadStatus, searchQuery, searchResult, searchError, searchSuggestions, onSearchInput, selectSuggestion, handleFileUpload, uploadFile, enrichData, fetchMedia, searchNewMedia, rateMedia, currentPage, totalPages, changePage, visiblePages, scrollSuggestions, suggestionScroll, rateExternal, fetchSuggestions, toggleFilter, isFilterActive, clearFilters, watchlist, toggleWatchlist, addToWatchlist, rateSearchResult, selectedSuggestion, openModal, closeModal, openWatchlistModal, getTrailerUrl, handleImageError, refreshMedia, rateExternalFromModal, addToWatchlistFromModal, createBackup, deepDiscoveries, discovering, runDeepDiscovery, aiAvailable, checkAiStatus, loadingMedia }
             }
         }).mount('#app')
     </script>
