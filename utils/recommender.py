@@ -256,7 +256,7 @@ def get_ai_thematic_candidates(profile, seen_titles):
     if not analyst.check_availability():
         return []
 
-    loved = [m.title for m in profile['loved_media']][:10]
+    loved = profile.get('loved_titles', [])[:10]
     genres = list(profile['genres'].keys())[:5]
     
     prompt = f"""
@@ -327,8 +327,12 @@ def get_general_intelligence_suggestions(db_instance, profile, seen_titles, limi
     if session is None: session = requests.Session()
     suggestions = []
     
+    # Re-query actual media objects from titles in profile
+    loved_media = Media.query.filter(Media.title.in_(profile.get('loved_titles', []))).all()
+    liked_media = Media.query.filter(Media.title.in_(profile.get('liked_titles', []))).all()
+    
     # Strategy A: Similarity via 'Loved' & 'Liked' Media DNA
-    dna_sample_pool = profile['loved_media'] + profile['liked_media']
+    dna_sample_pool = loved_media + liked_media
     if dna_sample_pool:
         sample_size = min(len(dna_sample_pool), 8)
         sample_likes = random.sample(dna_sample_pool, sample_size)
