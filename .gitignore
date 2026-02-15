@@ -17,9 +17,5 @@ dist/
 node_modules/
 .gemini/
 
-check_*.py
 backups/
 debug/
-dump_*sql
-migrated.db
-*copy.db

@@ -41,9 +41,10 @@ class AIAnalyst:
         - Themes: 3-5 specific narrative themes (e.g., 'Unreliable Narrator', 'Corporate Greed').
         - Mood: 2-3 emotive descriptors (e.g., 'Bleak', 'Witty', 'Suspenseful').
         - Aesthetic: 1-2 visual/stylistic descriptors (e.g., 'Neon Noir', 'Minimalist', 'Gritty').
+        - Tropes: 3-5 common narrative tropes (e.g., 'Fish out of Water', 'Enemies to Lovers', 'Slow Burn').
         
         Output ONLY a JSON object:
-        {{"themes": [], "mood": [], "aesthetic": []}}
+        {{"themes": [], "mood": [], "aesthetic": [], "tropes": []}}
         """
 
         try:
