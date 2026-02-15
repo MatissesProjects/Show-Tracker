@@ -523,7 +523,7 @@
                         const res = await fetch('http://localhost:5000/api/ai/status');
                         const data = await res.json();
                         aiAvailable.value = data.available;
-                        if (aiAvailable.value) runDeepDiscovery();
+                        // Automatic run disabled per user request
                     } catch (e) { aiAvailable.value = false; }
                 };
 
