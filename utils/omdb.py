@@ -38,3 +38,32 @@ class OMDBClient:
         except Exception as e:
             print(f"Error fetching from OMDb: {e}")
             return None
+
+    def search_list(self, query):
+        """Search for a list of titles matching a query."""
+        if not self.api_key or self.api_key == 'your_key_here':
+            return []
+            
+        cache_key = f"omdb_search_{query.lower().replace(' ', '_')}"
+        cached = get_cached_response(cache_key)
+        if cached:
+            return cached
+
+        params = {
+            'apikey': self.api_key,
+            's': query
+        }
+        
+        try:
+            response = requests.get(self.base_url, params=params)
+            response.raise_for_status()
+            data = response.json()
+            
+            if data.get('Response') == 'True':
+                results = data.get('Search', [])
+                set_cached_response(cache_key, results)
+                return results
+            return []
+        except Exception as e:
+            print(f"Error searching OMDb list: {e}")
+            return []

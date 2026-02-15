@@ -112,6 +112,17 @@ def rate_external_media():
     
     return jsonify({'message': 'Media processed successfully'}), 200
 
+@media_bp.route('/api/media/search-suggestions', methods=['GET'])
+def get_search_suggestions():
+    query = request.args.get('q')
+    if not query or len(query) < 2:
+        return jsonify([]), 200
+        
+    client = OMDBClient()
+    results = client.search_list(query)
+    # Return only top 5 for speed and cleaner UI
+    return jsonify(results[:5]), 200
+
 @media_bp.route('/api/media/<int:media_id>/details', methods=['GET'])
 def get_media_details(media_id):
     m = db.session.get(Media, media_id)
