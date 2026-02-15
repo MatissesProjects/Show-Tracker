@@ -71,11 +71,13 @@ def deep_discovery():
                 'title': data.get('Title'),
                 'year': data.get('Year'),
                 'genre': data.get('Genre'),
+                'genres': data.get('Genre'),
+                'media_type': data.get('Type'),
                 'poster': data.get('Poster'),
                 'summary': data.get('Plot'),
                 'match': score_data,
                 'on_netflix': False,
-                'youtube_url': f"https://www.youtube.com/results?search_query={data.get('Title').replace(' ', '+')}+official+trailer"
+                'youtube_url': f"https://www.youtube.com/results?search_query={data.get('Title').replace(' ', '+')}+{data.get('Type', '')}+funny+clips".replace('++', '+')
             })
     
     return jsonify(results), 200
@@ -103,12 +105,14 @@ def discover_media():
         'media_type': data.get('Type'),
         'year': data.get('Year'),
         'genre': data.get('Genre'),
+        'genres': data.get('Genre'),
         'runtime': data.get('Runtime'),
         'total_seasons': data.get('totalSeasons'),
         'plot': data.get('Plot'),
         'poster': data.get('Poster'),
         'match': score_data,
-        'local_rating': local_media.user_rating if local_media else 0
+        'local_rating': local_media.user_rating if local_media else 0,
+        'youtube_url': f"https://www.youtube.com/results?search_query={data.get('Title').replace(' ', '+')}+{data.get('Type', '')}+funny+clips".replace('++', '+')
     })
 
 @ai_bp.route('/api/suggestions', methods=['GET'])

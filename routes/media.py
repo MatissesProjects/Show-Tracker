@@ -121,32 +121,38 @@ def get_media_details(media_id):
     ai_insight = m.ai_insight
     thematic_dna = m.thematic_metadata
     
-    # We only call the AI if something is missing
+    # If something is missing, we trigger a background generation but don't block
     if not ai_insight or not thematic_dna:
-        analyst = AIAnalyst()
-        if analyst.check_availability():
-            # Get profile only if we actually need to generate an insight
-            profile = get_user_taste_profile()
-            
-            actors = ", ".join([mp.person.name for mp in m.person_memberships if mp.role == 'Actor'])
-            director = ", ".join([mp.person.name for mp in m.person_memberships if mp.role == 'Director'])
-            media_data = {'Actors': actors, 'Director': director, 'Genre': m.genres, 'imdbRating': m.rating}
+        from flask import current_app
+        app = current_app._get_current_object()
+        import threading
+        def background_enrichment(app_inner, media_id_inner):
+            with app_inner.app_context():
+                inner_m = db.session.get(Media, media_id_inner)
+                if not inner_m: return
+                
+                analyst = AIAnalyst()
+                if analyst.check_availability():
+                    profile = get_user_taste_profile()
+                    actors = ", ".join([mp.person.name for mp in inner_m.person_memberships if mp.role == 'Actor'])
+                    director = ", ".join([mp.person.name for mp in inner_m.person_memberships if mp.role == 'Director'])
+                    media_data = {'Actors': actors, 'Director': director, 'Genre': inner_m.genres, 'imdbRating': inner_m.rating, 'Plot': inner_m.overview}
 
-            if not ai_insight:
-                ai_insight = analyst.generate_insight(m.title, media_data, profile)
-                m.ai_insight = ai_insight
-            
-            if not thematic_dna:
-                dna_obj = analyst.extract_thematic_dna(m.title, media_data)
-                if dna_obj:
-                    m.thematic_metadata = json.dumps(dna_obj)
-                    thematic_dna = m.thematic_metadata
-            
-            try:
-                db.session.commit()
-            except Exception as e:
-                db.session.rollback()
-                print(f"Non-critical commit error in details route: {e}")
+                    if not inner_m.ai_insight:
+                        inner_m.ai_insight = analyst.generate_insight(inner_m.title, media_data, profile)
+                    
+                    if not inner_m.thematic_metadata:
+                        dna_obj = analyst.extract_thematic_dna(inner_m.title, media_data)
+                        if dna_obj:
+                            inner_m.thematic_metadata = json.dumps(dna_obj)
+                    
+                    try:
+                        db.session.commit()
+                    except Exception as e:
+                        db.session.rollback()
+                        print(f"Background commit error: {e}")
+
+        threading.Thread(target=background_enrichment, args=(app, media_id,)).start()
 
     # Now calculate match score (this is fast if profile is cached)
     profile = get_user_taste_profile()
@@ -154,6 +160,15 @@ def get_media_details(media_id):
     director = ", ".join([mp.person.name for mp in m.person_memberships if mp.role == 'Director'])
     media_data = {'Actors': actors, 'Director': director, 'Genre': m.genres, 'imdbRating': m.rating}
     score_data = calculate_match_score(media_data, profile)
+
+    # Better YouTube Query for Funny Clips
+    search_type = m.media_type or ""
+    if m.genres and "Anime" in m.genres:
+        search_type = "anime"
+    elif search_type == "tv":
+        search_type = "series"
+    
+    yt_query = f"{m.title} {search_type} funny clips".strip().replace(' ', '+')
 
     result = m.to_dict()
     result.update({
@@ -163,7 +178,7 @@ def get_media_details(media_id):
         'match': score_data,
         'ai_insight': ai_insight,
         'thematic_dna': json.loads(thematic_dna) if thematic_dna else None,
-        'youtube_url': f"https://www.youtube.com/results?search_query={m.title.replace(' ', '+')}+official+trailer",
+        'youtube_url': f"https://www.youtube.com/results?search_query={yt_query}",
         'on_netflix': False 
     })
     
