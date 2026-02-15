@@ -33,17 +33,20 @@ def deep_discovery():
     }
     
     prompt = f"""
-    [USER TASTE DNA]
+    [DEEP TASTE DNA]
     Loved: {', '.join(context['loved'][:10])}
     Liked: {', '.join(context['liked'][:10])}
     Top Genres: {', '.join(context['genres'])}
+    Disliked Genres: {', '.join(profile.get('disliked_genres', []))}
     
     [EXCLUDE THESE TITLES - USER HAS ALREADY WATCHED]
     {', '.join(all_tracked_titles)}
     
     [TASK]
-    Suggest exactly 3 NEW 'Hidden Gem' movies or shows that bridge these tastes but ARE NOT in the exclude list. 
-    Focus on: Smart Comedy, Hard Sci-Fi, or Cynical Characters.
+    Suggest exactly 3 NEW 'Deep Intelligence' matches. These should be 'Thematic Siblings'—media that shares the same tone, writing style, or philosophical themes as the loved list.
+    Avoid anything in the Disliked Genres.
+    Focus on finding 'Hidden Gems' (high quality but perhaps less mainstream).
+    
     Output ONLY a JSON array of titles. No explanation.
     Example: ["New Title 1", "New Title 2", "New Title 3"]
     """
@@ -76,6 +79,7 @@ def deep_discovery():
                 'poster': data.get('Poster'),
                 'summary': data.get('Plot'),
                 'match': score_data,
+                'vibe': score_data.get('vibe'),
                 'on_netflix': False,
                 'youtube_url': f"https://www.youtube.com/results?search_query={data.get('Title').replace(' ', '+')}+{data.get('Type', '')}+funny+clips".replace('++', '+')
             })

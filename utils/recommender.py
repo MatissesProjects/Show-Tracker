@@ -3,18 +3,18 @@ import random
 from models import Media, MediaPerson, Person, WatchHistory
 from database import db
 
+from datetime import datetime, timedelta
+
 def get_user_taste_profile(refresh=False):
-    """Aggregates the user's preferences with weighted importance for rated items."""
-    cache_key = "user_taste_dna_v1"
+    """Aggregates the user's preferences with weighted importance for rated items and recency."""
+    cache_key = "user_taste_dna_v2"
     if not refresh:
         cached = get_cached_response(cache_key, expiry_days=0.5) # 12 hour cache
         if cached:
-            # Convert lists back to sets/objects if necessary, 
-            # though here we mainly return dicts of scores.
             return cached
 
-    # Fetch all watched media to calculate refined weights
-    watched_media = Media.query.join(WatchHistory).distinct().all()
+    # Fetch all watched history with media objects
+    history_entries = db.session.query(WatchHistory, Media).join(Media).all()
     
     people_scores = {}
     genre_scores = {}
@@ -22,15 +22,43 @@ def get_user_taste_profile(refresh=False):
     mood_scores = {}
     aesthetic_scores = {}
     
+    # Negative taste signals
+    disliked_genres = {}
+    disliked_themes = {}
+    
     import json
-    for media in watched_media:
-        # Weight: 1.0 for Loved (2), 0.7 for Liked (1), 0.2 for Unrated (0)
-        weight = 0.2
-        if media.user_rating == 2: weight = 1.0
-        elif media.user_rating == 1: weight = 0.7
-        elif media.user_rating == -1: continue 
+    now = datetime.now()
+    
+    for history, media in history_entries:
+        # 1. Temporal Weighting (Decay)
+        # Recent watches (last 6 months) have higher impact on taste
+        days_ago = (now - history.watch_date).days
+        recency_multiplier = 1.0
+        if days_ago < 30: recency_multiplier = 2.5
+        elif days_ago < 90: recency_multiplier = 1.8
+        elif days_ago < 180: recency_multiplier = 1.3
         
-        # Talent & Genres (existing)
+        # 2. Sentiment Weighting
+        # Base weight: 1.0 for Loved (2), 0.7 for Liked (1), 0.2 for Unrated (0)
+        base_weight = 0.2
+        if media.user_rating == 2: base_weight = 1.0
+        elif media.user_rating == 1: base_weight = 0.7
+        elif media.user_rating == -1: 
+            # Capture negative signals separately
+            if media.genres:
+                for g in media.genres.split(', '):
+                    disliked_genres[g] = disliked_genres.get(g, 0) + 1
+            if media.thematic_metadata:
+                try:
+                    dna = json.loads(media.thematic_metadata)
+                    for t in dna.get('themes', []):
+                        disliked_themes[t] = disliked_themes.get(t, 0) + 1
+                except: pass
+            continue 
+        
+        weight = base_weight * recency_multiplier
+        
+        # Talent & Genres
         for mp in media.person_memberships:
             name = mp.person.name
             people_scores[name] = people_scores.get(name, 0) + weight
@@ -39,7 +67,7 @@ def get_user_taste_profile(refresh=False):
             for g in genres:
                 genre_scores[g] = genre_scores.get(g, 0) + weight
                 
-        # Thematic DNA (New)
+        # Thematic DNA
         if media.thematic_metadata:
             try:
                 dna = json.loads(media.thematic_metadata)
@@ -47,12 +75,16 @@ def get_user_taste_profile(refresh=False):
                     target_key = 'moods' if key == 'mood' else ('aesthetics' if key == 'aesthetic' else key)
                     for val in dna.get(key, []):
                         stats = theme_scores if target_key == 'themes' else (mood_scores if target_key == 'moods' else aesthetic_scores)
-                        # Tropes are handled as themes for scoring
                         if target_key == 'tropes': stats = theme_scores
                         stats[val] = stats.get(val, 0) + weight
             except: pass
 
-    # Tiered weight identification for explicit matching (Names instead of IDs for speed)
+    # Filter negative signals to find consistent dislikes (appeared > 1 time)
+    confirmed_disliked_genres = [g for g, count in disliked_genres.items() if count > 1]
+    confirmed_disliked_themes = [t for t, count in disliked_themes.items() if count > 1]
+
+    # Tiered weight identification
+    watched_media = Media.query.join(WatchHistory).distinct().all()
     loved_titles = [m.title for m in watched_media if m.user_rating == 2]
     liked_titles = [m.title for m in watched_media if m.user_rating == 1]
     loved_people = [p[0] for p in db.session.query(Person.name).join(MediaPerson).join(Media).filter(Media.user_rating == 2).distinct().all()]
@@ -75,24 +107,28 @@ def get_user_taste_profile(refresh=False):
         'liked_titles': liked_titles,
         'loved_people': loved_people,
         'liked_people': liked_people,
-        'disliked_people': disliked_people
+        'disliked_people': disliked_people,
+        'disliked_genres': confirmed_disliked_genres,
+        'disliked_themes': confirmed_disliked_themes
     }
     
     set_cached_response(cache_key, result)
     return result
 
 def calculate_match_score(media_data, profile):
-    """Enhanced scoring with tiered weights and Creator/Director awareness."""
+    """Enhanced scoring with tiered weights, negative signals, and Vibe detection."""
     score = 0
     details = []
+    vibes = []
     
     actors = media_data.get('Actors') or media_data.get('cast') or ''
     director = media_data.get('Director') or ''
     writer = media_data.get('Writer') or ''
     genres_list = media_data.get('genres', []) if isinstance(media_data.get('genres'), list) else (media_data.get('Genre', '').split(', ') if media_data.get('Genre') else [])
     rating = media_data.get('imdbRating') or (media_data.get('rating') or {}).get('average') or 0
-
-    # Talent & Creator Pool
+    runtime = media_data.get('runtime') or 0
+    
+    # 1. Talent & Creator Pool
     talent_pool = []
     if isinstance(actors, list): talent_pool.extend(actors)
     else:
@@ -101,96 +137,109 @@ def calculate_match_score(media_data, profile):
         else:
             talent_pool.extend([p.split(' (')[0].strip() for p in actors.split(', ') if p])
     
-    # Add Creators/Directors
     talent_pool.extend([p.strip() for p in director.split(',') if p])
     talent_pool.extend([p.strip() for p in writer.split(',') if p])
 
-    # Pre-convert to sets for O(1) lookups
     loved_set = set(profile.get('loved_people', []))
     liked_set = set(profile.get('liked_people', []))
     disliked_set = set(profile.get('disliked_people', []))
 
+    talent_match_score = 0
     for person_name in set(talent_pool):
         if person_name in disliked_set:
-            score -= 100 # Heavily penalize dislikes
+            score -= 100
             details.append(f"Avoid: {person_name} (Disliked) (-100)")
             continue
         
         if person_name in loved_set:
-            score += 120 # Massive boost for loved creators/actors
+            points = 120
+            score += points
+            talent_match_score += points
             details.append(f"Starring/Created by {person_name} (LOVED) (+120)")
         elif person_name in liked_set:
-            score += 50
+            points = 50
+            score += points
+            talent_match_score += points
             details.append(f"Starring/Created by {person_name} (Liked) (+50)")
 
         if person_name in profile['people']:
             weighted_count = profile['people'][person_name]
-            # Higher reward for talent you've explicitly rated/liked multiple times
-            if weighted_count > 3:
-                points = 40
-            elif weighted_count > 1:
-                points = 20
-            else:
-                points = 10
+            points = 40 if weighted_count > 3 else (20 if weighted_count > 1 else 10)
             score += points
+            talent_match_score += points
             details.append(f"Frequent Talent: {person_name} (Weighted: {round(weighted_count, 1)}) (+{points})")
 
-    # Genre Affinity
+    if talent_match_score > 100: vibes.append("Star-Studded")
+
+    # 2. Genre Affinity & Negative Signals
     genre_match_count = 0
+    disliked_genres = set(profile.get('disliked_genres', []))
     for genre in genres_list:
+        if genre in disliked_genres:
+            score -= 60
+            details.append(f"Avoid Genre: {genre} (-60)")
+            continue
+
         if genre in profile['genres']:
             weight = profile['genres'][genre]
             score += round(weight, 1)
             genre_match_count += 1
-            if weight > 30: # Top tier genre
-                score += 10 # Bonus for high-affinity genre
+            if weight > 30: score += 10
     
     if genre_match_count > 0:
         details.append(f"Matched {genre_match_count} Preferred Genres")
 
-    # Thematic DNA Matching (New)
-    # Since we can't extract DNA for every suggestion instantly without killing API,
-    # we use a "DNA Similarity" strategy if the suggestion already has DNA cached.
-    # If not, the "Thematic AI Discovery" strategy in get_proactive_suggestions handles it.
-    
-    # Check if this item has cached DNA (via APICache or it's a known Media item)
-    cache_key = f"ai_dna_{media_data.get('Title', '').lower().replace(' ', '_')}"
+    # 3. Thematic DNA Matching
+    dna_match_score = 0
+    cache_key = f"ai_dna_{media_data.get('Title', media_data.get('name', '')).lower().replace(' ', '_')}"
     cached_dna = get_cached_response(cache_key)
     if cached_dna:
-        dna_score = 0
         matches = []
+        disliked_themes = set(profile.get('disliked_themes', []))
+        
         for t in cached_dna.get('themes', []):
-            if t in profile['themes']:
-                dna_score += 15
+            if t in disliked_themes:
+                score -= 40
+                details.append(f"Avoid Theme: {t} (-40)")
+            elif t in profile['themes']:
+                dna_match_score += 15
                 matches.append(t)
+        
         for m in cached_dna.get('mood', []):
             if m in profile['moods']:
-                dna_score += 10
+                dna_match_score += 10
                 matches.append(m)
-        for a in cached_dna.get('aesthetic', []):
-            if a in profile['aesthetics']:
-                dna_score += 10
-                matches.append(a)
         
-        if dna_score > 0:
-            score += dna_score
-            details.append(f"DNA Match: {', '.join(matches[:3])} (+{dna_score})")
+        if dna_match_score > 0:
+            score += dna_match_score
+            details.append(f"DNA Match: {', '.join(matches[:3])} (+{dna_match_score})")
 
-    # Quality Signal
+    if dna_match_score > 30: vibes.append("Perfect Vibe")
+
+    # 4. Quality & Pacing Signals
     try:
         r_val = float(rating)
         if r_val > 8.5:
-            score += 40 # Masterpiece boost
+            score += 40
             details.append(f"Top-Tier Rating ({r_val}) (+40)")
         elif r_val > 7.5:
             score += 20
             details.append(f"Solid Rating ({r_val}) (+20)")
-        elif r_val < 5.0 and r_val > 0:
-            score -= 30
-            details.append(f"Poorly Rated ({r_val}) (-30)")
     except: pass
     
-    return {'total_score': round(score, 1), 'breakdown': details}
+    # Vibe logic based on metadata
+    if runtime and int(runtime) < 30: vibes.append("Quick Binge")
+    elif runtime and int(runtime) > 55: vibes.append("Deep Dive")
+    
+    if not vibes:
+        if score > 150: vibes.append("Must Watch")
+        else: vibes.append("Solid Choice")
+
+    return {
+        'total_score': round(score, 1), 
+        'breakdown': details,
+        'vibe': vibes[0] if vibes else "General Recommendation"
+    }
 
 from utils.cache import get_cached_response, set_cached_response
 import time
@@ -453,6 +502,7 @@ def format_suggestion(show, score_data):
         'total_seasons': None, # TVMaze doesn't provide this in the search response easily
         'poster': (show.get('image') or {}).get('medium'),
         'match': score_data,
+        'vibe': score_data.get('vibe'),
         'on_netflix': 'Netflix' in [network, web_channel],
         'summary': (show.get('summary') or '').replace('<p>', '').replace('</p>', '').replace('<b>', '').replace('</b>', '').strip(),
         'youtube_url': f"https://www.youtube.com/results?search_query={title.replace(' ', '+')}+funny+moments+clips"
