@@ -52,13 +52,10 @@ def get_user_taste_profile(refresh=False):
                         stats[val] = stats.get(val, 0) + weight
             except: pass
 
-    # Tiered weight identification for explicit matching
-    loved_titles = [m.title for m in watched_media if m.user_rating == 2]
-    liked_titles = [m.title for m in watched_media if m.user_rating == 1]
-    
-    loved_people_ids = [p[0] for p in db.session.query(MediaPerson.person_id).join(Media).filter(Media.user_rating == 2).distinct().all()]
-    liked_people_ids = [p[0] for p in db.session.query(MediaPerson.person_id).join(Media).filter(Media.user_rating == 1).distinct().all()]
-    disliked_people_ids = [p[0] for p in db.session.query(MediaPerson.person_id).join(Media).filter(Media.user_rating == -1).distinct().all()]
+    # Tiered weight identification for explicit matching (Names instead of IDs for speed)
+    loved_people = [p[0] for p in db.session.query(Person.name).join(MediaPerson).join(Media).filter(Media.user_rating == 2).distinct().all()]
+    liked_people = [p[0] for p in db.session.query(Person.name).join(MediaPerson).join(Media).filter(Media.user_rating == 1).distinct().all()]
+    disliked_people = [p[0] for p in db.session.query(Person.name).join(MediaPerson).join(Media).filter(Media.user_rating == -1).distinct().all()]
 
     if genre_scores:
         max_genre_score = max(genre_scores.values())
@@ -74,9 +71,9 @@ def get_user_taste_profile(refresh=False):
         'aesthetics': aesthetic_scores,
         'loved_titles': loved_titles,
         'liked_titles': liked_titles,
-        'loved_people_ids': loved_people_ids,
-        'liked_people_ids': liked_people_ids,
-        'disliked_people_ids': disliked_people_ids
+        'loved_people': loved_people,
+        'liked_people': liked_people,
+        'disliked_people': disliked_people
     }
     
     set_cached_response(cache_key, result)
@@ -106,20 +103,23 @@ def calculate_match_score(media_data, profile):
     talent_pool.extend([p.strip() for p in director.split(',') if p])
     talent_pool.extend([p.strip() for p in writer.split(',') if p])
 
+    # Pre-convert to sets for O(1) lookups
+    loved_set = set(profile.get('loved_people', []))
+    liked_set = set(profile.get('liked_people', []))
+    disliked_set = set(profile.get('disliked_people', []))
+
     for person_name in set(talent_pool):
-        person_obj = Person.query.filter_by(name=person_name).first()
-        if person_obj:
-            if person_obj.id in profile['disliked_people_ids']:
-                score -= 100 # Heavily penalize dislikes
-                details.append(f"Avoid: {person_name} (Disliked) (-100)")
-                continue
-            
-            if person_obj.id in profile['loved_people_ids']:
-                score += 120 # Massive boost for loved creators/actors
-                details.append(f"Starring/Created by {person_name} (LOVED) (+120)")
-            elif person_obj.id in profile['liked_people_ids']:
-                score += 50
-                details.append(f"Starring/Created by {person_name} (Liked) (+50)")
+        if person_name in disliked_set:
+            score -= 100 # Heavily penalize dislikes
+            details.append(f"Avoid: {person_name} (Disliked) (-100)")
+            continue
+        
+        if person_name in loved_set:
+            score += 120 # Massive boost for loved creators/actors
+            details.append(f"Starring/Created by {person_name} (LOVED) (+120)")
+        elif person_name in liked_set:
+            score += 50
+            details.append(f"Starring/Created by {person_name} (Liked) (+50)")
 
         if person_name in profile['people']:
             weighted_count = profile['people'][person_name]
