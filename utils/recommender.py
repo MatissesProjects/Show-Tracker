@@ -53,6 +53,8 @@ def get_user_taste_profile(refresh=False):
             except: pass
 
     # Tiered weight identification for explicit matching (Names instead of IDs for speed)
+    loved_titles = [m.title for m in watched_media if m.user_rating == 2]
+    liked_titles = [m.title for m in watched_media if m.user_rating == 1]
     loved_people = [p[0] for p in db.session.query(Person.name).join(MediaPerson).join(Media).filter(Media.user_rating == 2).distinct().all()]
     liked_people = [p[0] for p in db.session.query(Person.name).join(MediaPerson).join(Media).filter(Media.user_rating == 1).distinct().all()]
     disliked_people = [p[0] for p in db.session.query(Person.name).join(MediaPerson).join(Media).filter(Media.user_rating == -1).distinct().all()]
@@ -327,12 +329,8 @@ def get_general_intelligence_suggestions(db_instance, profile, seen_titles, limi
     if session is None: session = requests.Session()
     suggestions = []
     
-    # Re-query actual media objects from titles in profile
-    loved_media = Media.query.filter(Media.title.in_(profile.get('loved_titles', []))).all()
-    liked_media = Media.query.filter(Media.title.in_(profile.get('liked_titles', []))).all()
-    
     # Strategy A: Similarity via 'Loved' & 'Liked' Media DNA
-    dna_sample_pool = loved_media + liked_media
+    dna_sample_pool = profile['loved_media'] + profile['liked_media']
     if dna_sample_pool:
         sample_size = min(len(dna_sample_pool), 8)
         sample_likes = random.sample(dna_sample_pool, sample_size)
